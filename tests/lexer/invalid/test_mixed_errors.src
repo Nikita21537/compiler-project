@@ -1,0 +1,4 @@
+int @invalid = 42;
+string text = "unterminated
+float 123invalid = 3.14;
+int overflow = 2147483648;
