@@ -1,0 +1,24 @@
+fn test_operators() {
+    int x = 5;
+    int y = 10;
+
+    // Arithmetic
+    int sum = x + y;
+    int diff = x - y;
+    int prod = x * y;
+    int quot = y / x;
+    int rem = y % x;
+
+    // Relational
+    bool eq = x == y;
+    bool neq = x != y;
+    bool lt = x < y;
+    bool gt = x > y;
+    bool lte = x <= y;
+    bool gte = x >= y;
+
+    // Logical
+    bool and = true && false;
+    bool or = true || false;
+    bool not = !true;
+}

@@ -1,0 +1,12 @@
+fn calculate() {
+    int a = 10;
+    int b = 20;
+    int result = a + b * (5 - 3);
+
+    float pi = 3.14159;
+    bool is_valid = true;
+
+    if (result > 0 && is_valid) {
+        return result;
+    }
+}

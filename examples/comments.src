@@ -1,0 +1,12 @@
+fn main() {
+    // Single line comment
+    int counter = 0;  // End of line comment
+
+    /* Nested /* comment */ test */
+    while (counter < 10) {
+        counter = counter + 1;
+    }
+
+    // TODO: Add more functionality
+    return counter;
+}
