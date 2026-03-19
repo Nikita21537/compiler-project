@@ -1,9 +1,0 @@
-README.md
-setup.py
-src/minicompiler.egg-info/PKG-INFO
-src/minicompiler.egg-info/SOURCES.txt
-src/minicompiler.egg-info/dependency_links.txt
-src/minicompiler.egg-info/entry_points.txt
-src/minicompiler.egg-info/top_level.txt
-tests/test_cli.py
-tests/test_lexer.py
