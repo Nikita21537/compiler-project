@@ -270,3 +270,4 @@ Identifier ::= letter { letter | digit | "_" }
 // 5. Объявления структур используют:
 //      struct Point { int x; int y; }
 
+
