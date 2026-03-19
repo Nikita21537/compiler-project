@@ -94,31 +94,31 @@ Call           ::= Identifier "(" [ Arguments ] ")"
 
 #compiler-project/
 ├── docs/
-│   ├── language_spec.md          # Лексическая спецификация
-│   └── grammar.md                 # Грамматика языка
+│   ├── language_spec.md           Лексическая спецификация
+│   └── grammar.md                  Грамматика языка
 ├── examples/
-│   ├── comments.src               # Пример с комментариями
-│   ├── hello.src                  # Простой пример
-│   └── factorial.src              # Пример с функциями
+│   ├── comments.src               Пример с комментариями
+│   ├── hello.src                   Простой пример
+│   └── factorial.src               Пример с функциями
 ├── src/
-│   ├── lexer/                      # Спринт 1
-│   │   ├── scanner.py              # Лексический анализатор
-│   │   └── token.py                # Классы токенов
-│   ├── parser/                      # Спринт 2
-│   │   ├── parser.py                # Рекурсивный парсер
-│   │   ├── ast.py                   # Классы AST
-│   │   ├── visitor.py               # Базовый visitor и pretty printer
-│   │   └── grammar.txt               # Грамматика в тексте
+│   ├── lexer/                       Спринт 1
+│   │   ├── scanner.py               Лексический анализатор
+│   │   └── token.py                 Классы токенов
+│   ├── parser/                      Спринт 2
+│   │   ├── parser.py                 Рекурсивный парсер
+│   │   ├── ast.py                    Классы AST
+│   │   ├── visitor.py                Базовый visitor и pretty printer
+│   │   └── grammar.txt                Грамматика в тексте
 │   ├── preprocessor/
-│   │   ├── preprocessor.py          # Удаление комментариев
-│   │   └── macros.py                 # Обработка макросов
-│   └── cli.py                        # Интерфейс командной строки
+│   │   ├── preprocessor.py           Удаление комментариев
+│   │   └── macros.py                  Обработка макросов
+│   └── cli.py                         Интерфейс командной строки
 ├── tests/
-│   ├── test_cli.py                  # Тесты CLI
-│   ├── test_lexer.py                 # Тесты лексера
-│   └── parser/                       # Тесты парсера
-│       ├── test_parser.py            # Основные тесты парсера
-│       └── golden/                    # Золотые тесты
+│   ├── test_cli.py                   Тесты CLI
+│   ├── test_lexer.py                  Тесты лексера
+│   └── parser/                        Тесты парсера
+│       ├── test_parser.py             Основные тесты парсера
+│       └── golden/                     Золотые тесты
 │           ├── simple_function.src
 │           ├── simple_function.expected
 │           ├── if_else_function.src
