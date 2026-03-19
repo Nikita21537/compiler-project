@@ -3,30 +3,80 @@ from typing import Any, Optional
 
 
 class TokenType(Enum):
+    # Ключевые слова
+    KW_IF = auto()
+    KW_ELSE = auto()
+    KW_WHILE = auto()
+    KW_FOR = auto()
+    KW_INT = auto()
+    KW_FLOAT = auto()
+    KW_BOOL = auto()
+    KW_RETURN = auto()
+    KW_VOID = auto()
+    KW_STRUCT = auto()
+    KW_FN = auto()
+    KW_STRING = auto()  # Добавлено для типа string
 
-    KW_IF = auto();KW_ELSE = auto();KW_WHILE = auto();KW_FOR = auto();KW_INT = auto();KW_FLOAT = auto();KW_BOOL = auto()
-    KW_RETURN = auto();KW_VOID = auto();KW_STRUCT = auto();KW_FN = auto()
-
-
+    # Литералы
     IDENTIFIER = auto()
     INT_LITERAL = auto()
     FLOAT_LITERAL = auto()
     STRING_LITERAL = auto()
     BOOL_LITERAL = auto()
 
+    # Операторы арифметические
+    PLUS = auto()
+    MINUS = auto()
+    STAR = auto()
+    SLASH = auto()
+    PERCENT = auto()
 
-    PLUS = auto();MINUS = auto();STAR = auto();SLASH = auto();PERCENT = auto();PLUS_ASSIGN = auto()
-    MINUS_ASSIGN = auto();STAR_ASSIGN = auto();SLASH_ASSIGN = auto()
+    # Операторы присваивания
+    ASSIGN = auto()  # =
+    PLUS_ASSIGN = auto()  # +=
+    MINUS_ASSIGN = auto()  # -=
+    STAR_ASSIGN = auto()  # *=
+    SLASH_ASSIGN = auto()  # /=
 
-    EQ = auto();NEQ = auto();LT = auto(); LEQ = auto();GT = auto(); GEQ = auto();AND = auto();OR = auto()
-    NOT = auto();ASSIGN = auto(); LPAREN = auto();RPAREN = auto();LBRACE = auto(); RBRACE = auto()
-    LBRACKET = auto();RBRACKET = auto(); COMMA = auto();SEMICOLON = auto();COLON = auto()
+    # Операторы сравнения
+    EQ = auto()  # ==
+    NEQ = auto()  # !=
+    LT = auto()  # <
+    LEQ = auto()  # <=
+    GT = auto()  # >
+    GEQ = auto()  # >=
 
+    # Логические операторы
+    AND = auto()  # &&
+    OR = auto()  # ||
+    NOT = auto()  # !
+
+    # Инкремент/декремент
+    INCREMENT = auto()  # ++
+    DECREMENT = auto()  # --
+
+    # Стрелка для типа возврата
+    ARROW = auto()  # ->
+
+    # Разделители
+    LPAREN = auto()  # (
+    RPAREN = auto()  # )
+    LBRACE = auto()  # {
+    RBRACE = auto()  # }
+    LBRACKET = auto()  # [
+    RBRACKET = auto()  # ]
+    COMMA = auto()  # ,
+    SEMICOLON = auto()  # ;
+    COLON = auto()  # :
+    DOT = auto()  # . (для доступа к полям структур)
+
+    # Специальные
     EOF = auto()
     ERROR = auto()
 
 
 class Token:
+
     def __init__(
             self,
             token_type: TokenType,
