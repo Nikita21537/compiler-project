@@ -92,7 +92,7 @@ Call           ::= Identifier "(" [ Arguments ] ")"
 11 (низш.)	= += -= *= /=	Правая
 ## Структура проекта
 
-compiler-project/
+#compiler-project/
 ├── docs/
 │   ├── language_spec.md          # Лексическая спецификация
 │   └── grammar.md                 # Грамматика языка
