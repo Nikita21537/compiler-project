@@ -13,7 +13,7 @@
 ### 1.2 Комментарии
 comment = single_line_comment | multi_line_comment ;
 single_line_comment = "//" , { character } , ( newline | EOF ) ;
-multi_line_comment = "/" , { character } , "/" ;
++ multi_line_comment = "/*" , { character } , "*/" ;
 newline = "\n" | "\r\n" ;
 
 
@@ -78,7 +78,7 @@ rel_operator = "==" | "!=" | "<" | "<=" | ">" | ">=" ;
 
 
 **Логические:**
-logic_operator = "&&" ;
++ logic_operator = "&&" | "||" | "!" ;
 
 
 **Присваивание:**
