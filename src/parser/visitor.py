@@ -1,4 +1,3 @@
-# src/parser/visitor.py
 from src.parser.ast import *
 
 
