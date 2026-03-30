@@ -91,7 +91,7 @@ Call           ::= Identifier "(" [ Arguments ] ")"
 10	||	Левая
 11 (низш.)	= += -= *= /=	Правая
 ## Структура проекта
-###
+##
 #compiler-project/
 ├── docs/
 │   ├── language_spec.md           Лексическая спецификация
@@ -128,7 +128,7 @@ Call           ::= Identifier "(" [ Arguments ] ")"
 ├── Makefile
 ├── setup.py
 └── README.md
-###
+##
 Требования
 Python 3.8 или выше
 
