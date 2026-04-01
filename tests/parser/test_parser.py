@@ -1,4 +1,3 @@
-# tests/parser/test_parser.py
 import pytest
 import sys
 from pathlib import Path
@@ -15,7 +14,7 @@ from src.parser.visitor import ASTPrettyPrinter, ASTSemanticAnalyzer
 
 
 def parse(code: str):
-    """Вспомогательная функция для разбора кода"""
+ 
     scanner = Scanner(code)
     tokens = scanner.scan_tokens()
     lex_errors = scanner.get_errors()
@@ -28,13 +27,11 @@ def parse(code: str):
 
 
 def parse_program(code: str):
-    """Разбор программы, возвращает AST и ошибки"""
     ast, lex_errors, parse_errors = parse(code)
     return ast, lex_errors + parse_errors
 
 
 def parse_stmt(stmt_source: str):
-    """Разбор отдельного оператора (обернутого в функцию)"""
     code = f"""
     fn main() -> void {{
         {stmt_source}
@@ -45,7 +42,6 @@ def parse_stmt(stmt_source: str):
 
 
 def first_stmt(ast):
-    """Получить первый оператор из тела функции main"""
     assert len(ast.declarations) > 0, "Нет объявлений в программе"
     func = ast.declarations[0]
     assert isinstance(func, FunctionDeclNode), "Первый узел не функция"
@@ -55,7 +51,6 @@ def first_stmt(ast):
 
 
 def normalize(text: str) -> str:
-    """Нормализация текста для сравнения"""
     return text.replace("\r\n", "\n").strip()
 
 
@@ -67,7 +62,6 @@ GOLDEN_DIR = Path(__file__).parent / "golden"
 
 
 def get_golden_tests():
-    """Получить все файлы .src для золотых тестов"""
     if not GOLDEN_DIR.exists():
         GOLDEN_DIR.mkdir(parents=True, exist_ok=True)
         # Создаем тестовые файлы если их нет
@@ -76,7 +70,6 @@ def get_golden_tests():
 
 
 def _create_golden_test_files():
-    """Создает тестовые файлы для золотых тестов"""
 
     # Тест 1: Простая функция с return
     src1 = GOLDEN_DIR / "simple_function.src"
@@ -155,7 +148,6 @@ def _create_golden_test_files():
 
 @pytest.mark.parametrize("src_file", get_golden_tests(), ids=lambda p: p.stem)
 def test_golden(src_file: Path):
-    """Золотой тест: сравнивает вывод pretty printer с ожидаемым"""
     expected_file = src_file.with_suffix(".expected")
 
     assert expected_file.exists(), f"Отсутствует файл с ожидаемым результатом: {expected_file}"
@@ -196,7 +188,6 @@ def test_golden(src_file: Path):
 # ===================================================
 
 def test_literal_expressions():
-    """Тест литеральных выражений"""
     code = """
     fn main() -> void {
         42;
@@ -235,7 +226,6 @@ def test_literal_expressions():
 
 
 def test_identifier_expression():
-    """Тест идентификатора"""
     code = """
     fn main() -> void {
         x;
@@ -251,7 +241,6 @@ def test_identifier_expression():
 
 
 def test_binary_expressions():
-    """Тест бинарных операций"""
     code = """
     fn main() -> void {
         a + b;
@@ -286,7 +275,6 @@ def test_binary_expressions():
 
 
 def test_operator_precedence():
-    """Тест приоритета операторов: 1 + 2 * 3 должно быть 1 + (2 * 3)"""
     ast, errors = parse_stmt("1 + 2 * 3;")
     assert not errors, f"Ошибки парсера: {errors}"
 
@@ -301,7 +289,6 @@ def test_operator_precedence():
 
 
 def test_parentheses_precedence():
-    """Тест скобок: (1 + 2) * 3 должно быть (1 + 2) * 3"""
     ast, errors = parse_stmt("(1 + 2) * 3;")
     assert not errors, f"Ошибки парсера: {errors}"
 
@@ -314,7 +301,6 @@ def test_parentheses_precedence():
 
 
 def test_logical_precedence():
-    """Тест приоритета логических операций: a || b && c должно быть a || (b && c)"""
     ast, errors = parse_stmt("a || b && c;")
     assert not errors, f"Ошибки парсера: {errors}"
 
@@ -327,7 +313,6 @@ def test_logical_precedence():
 
 
 def test_unary_expressions():
-    """Тест унарных операций"""
     code = """
     fn main() -> void {
         -x;
@@ -353,7 +338,6 @@ def test_unary_expressions():
 
 
 def test_assignment_expressions():
-    """Тест операций присваивания"""
     code = """
     fn main() -> void {
         x = 42;
@@ -380,7 +364,6 @@ def test_assignment_expressions():
 
 
 def test_call_expression():
-    """Тест вызова функции"""
     code = """
     fn main() -> void {
         foo();
@@ -414,7 +397,6 @@ def test_call_expression():
 # ===================================================
 
 def test_if_statement():
-    """Тест оператора if"""
     code = """
     fn main() -> void {
         if (x > 0) {
@@ -431,7 +413,6 @@ def test_if_statement():
 
 
 def test_if_else_statement():
-    """Тест оператора if-else"""
     code = """
     fn main() -> void {
         if (x) {
@@ -451,7 +432,6 @@ def test_if_else_statement():
 
 
 def test_while_statement():
-    """Тест цикла while"""
     code = """
     fn main() -> void {
         while (x > 0) {
@@ -469,7 +449,6 @@ def test_while_statement():
 
 
 def test_for_statement_with_declaration():
-    """Тест цикла for с объявлением переменной"""
     code = """
     fn main() -> void {
         for (int i = 0; i < 10; i = i + 1) {
@@ -491,7 +470,6 @@ def test_for_statement_with_declaration():
 
 
 def test_for_statement_with_expression():
-    """Тест цикла for с выражением в инициализации"""
     code = """
     fn main() -> void {
         for (i = 0; i < 10; i = i + 1) {
@@ -509,7 +487,6 @@ def test_for_statement_with_expression():
 
 
 def test_for_empty_parts():
-    """Тест пустых частей цикла for (бесконечный цикл)"""
     code = """
     fn main() -> void {
         for (;;) {
@@ -528,7 +505,6 @@ def test_for_empty_parts():
 
 
 def test_return_statement_with_value():
-    """Тест оператора return со значением"""
     code = """
     fn main() -> int {
         return 42;
@@ -547,7 +523,6 @@ def test_return_statement_with_value():
 
 
 def test_return_statement_without_value():
-    """Тест оператора return без значения"""
     code = """
     fn main() -> void {
         return;
@@ -564,7 +539,6 @@ def test_return_statement_without_value():
 
 
 def test_empty_statement():
-    """Тест пустого оператора"""
     code = """
     fn main() -> void {
         ;
@@ -578,7 +552,6 @@ def test_empty_statement():
 
 
 def test_block_statement():
-    """Тест блока операторов"""
     code = """
     fn main() -> void {
         {
@@ -601,7 +574,6 @@ def test_block_statement():
 # ===================================================
 
 def test_variable_declaration():
-    """Тест объявления переменной"""
     code = "int x = 5;"
     ast, errors = parse_program(code)
     assert not errors, f"Ошибки парсера: {errors}"
@@ -615,7 +587,6 @@ def test_variable_declaration():
 
 
 def test_variable_declaration_no_initializer():
-    """Тест объявления переменной без инициализации"""
     code = "int x;"
     ast, errors = parse_program(code)
     assert not errors, f"Ошибки парсера: {errors}"
@@ -628,7 +599,6 @@ def test_variable_declaration_no_initializer():
 
 
 def test_function_declaration_no_params():
-    """Тест объявления функции без параметров"""
     code = """
     fn main() -> int {
         return 0;
@@ -646,7 +616,6 @@ def test_function_declaration_no_params():
 
 
 def test_function_declaration_with_params():
-    """Тест объявления функции с параметрами"""
     code = """
     fn add(int a, int b) -> int {
         return a + b;
@@ -670,7 +639,6 @@ def test_function_declaration_with_params():
 
 
 def test_function_declaration_no_return_type():
-    """Тест объявления функции без возвращаемого типа (по умолчанию void)"""
     code = """
     fn main() {
         return;
@@ -685,7 +653,6 @@ def test_function_declaration_no_return_type():
 
 
 def test_struct_declaration():
-    """Тест объявления структуры"""
     code = """
     struct Point {
         int x;
@@ -710,7 +677,6 @@ def test_struct_declaration():
 
 
 def test_struct_access():
-    """Тест доступа к полям структуры"""
     code = """
     fn main() -> void {
         point.x = 10;
@@ -740,7 +706,6 @@ def test_struct_access():
 # ===================================================
 
 def test_factorial_program():
-    """Тест программы вычисления факториала"""
     code = """
     fn factorial(int n) -> int {
         int result = 1;
@@ -778,7 +743,6 @@ def test_factorial_program():
 
 
 def test_complex_program():
-    """Тест сложной программы с разными конструкциями"""
     code = """
     struct Point {
         int x;
@@ -835,7 +799,6 @@ def test_complex_program():
 # ===================================================
 
 def test_semantic_variable_scope():
-    """Тест семантического анализа: области видимости переменных"""
     code = """
     fn main() -> void {
         int x = 5;
@@ -859,7 +822,6 @@ def test_semantic_variable_scope():
 
 
 def test_semantic_duplicate_declaration():
-    """Тест семантического анализа: повторное объявление переменной"""
     code = """
     fn main() -> void {
         int x = 5;
@@ -879,7 +841,6 @@ def test_semantic_duplicate_declaration():
 
 
 def test_semantic_function_call():
-    """Тест семантического анализа: вызов необъявленной функции"""
     code = """
     fn main() -> void {
         foo();  // Ошибка: функция foo не объявлена
@@ -898,7 +859,6 @@ def test_semantic_function_call():
 
 
 def test_semantic_int_range():
-    """Тест семантического анализа: выход целого числа за пределы 32-бит"""
     code = """
     fn main() -> void {
         int x = 2147483648;  // Ошибка: больше максимального 2^31-1
@@ -924,7 +884,6 @@ def test_semantic_int_range():
 # ===================================================
 
 def test_missing_semicolon():
-    """Тест: пропущенная точка с запятой"""
     code = "int x = 5"
     tokens = Scanner(code).scan_tokens()
     parser = Parser(tokens)
@@ -936,7 +895,6 @@ def test_missing_semicolon():
 
 
 def test_missing_parenthesis():
-    """Тест: пропущенная закрывающая скобка"""
     code = """
     fn main() -> void {
         if (x > 0 {
@@ -954,7 +912,6 @@ def test_missing_parenthesis():
 
 
 def test_unexpected_token():
-    """Тест: неожиданный токен"""
     code = "int x = @42;"
     scanner = Scanner(code)
     tokens = scanner.scan_tokens()
@@ -970,7 +927,6 @@ def test_unexpected_token():
 
 
 def test_error_recovery():
-    """Тест: восстановление после ошибки"""
     code = """
     int x = ;      // Ошибка: пропущено выражение
     int y = 42;    // Должно быть распарсено после восстановления
@@ -998,7 +954,6 @@ def test_error_recovery():
 
 
 def test_missing_function_name():
-    """Тест: пропущено имя функции"""
     code = "fn () {}"
     tokens = Scanner(code).scan_tokens()
     parser = Parser(tokens)
@@ -1010,7 +965,6 @@ def test_missing_function_name():
 
 
 def test_missing_brace():
-    """Тест: пропущенная закрывающая фигурная скобка"""
     code = """
     fn main() -> void {
         int x = 5;
@@ -1030,7 +984,6 @@ def test_missing_brace():
 # ===================================================
 
 def test_lexer_parser_integration():
-    """Тест интеграции лексера и парсера"""
     code = "fn main() { return 42; }"
 
     # Лексический анализ
@@ -1055,7 +1008,6 @@ def test_lexer_parser_integration():
 # В tests/parser/test_parser.py замените функцию:
 
 def test_pretty_print_roundtrip():
-    """Тест: pretty print -> повторный разбор дает ту же структуру"""
     original_code = """
 fn test() {
     int x = 42;
