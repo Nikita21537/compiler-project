@@ -1,9 +1,9 @@
-# src/cli.py
 import argparse
 import sys
 import subprocess
 from pathlib import Path
 from typing import List, Optional
+
 
 from src.lexer.scanner import Scanner
 from src.lexer.token import TokenType
@@ -11,7 +11,6 @@ from src.preprocessor.preprocessor import Preprocessor
 from src.parser.parser import Parser
 from src.parser.visitor import ASTPrettyPrinter, ASTSemanticAnalyzer
 from src.parser.ast import ast_to_json, generate_dot
-
 
 SPEC_PATH = Path("docs/language_spec.md")
 
@@ -35,7 +34,6 @@ def print_errors(errors, title="Ошибки:") -> bool:
                 line, col, msg = error
                 print(f"[Строка {line}, Колонка {col}] {msg}", file=sys.stderr)
             elif hasattr(error, 'line') and hasattr(error, 'column') and hasattr(error, 'message'):
-                # Для объектов ошибок из парсера
                 print(f"[Строка {error.line}, Колонка {error.column}] {error.message}", file=sys.stderr)
             else:
                 print(error, file=sys.stderr)
@@ -94,7 +92,6 @@ def run_lex(args):
 def run_parse(args):
     source = read_file(args.input)
 
-    # Препроцессинг если нужно
     if args.preprocess:
         pp = Preprocessor(source)
         source = pp.process()
@@ -103,7 +100,6 @@ def run_parse(args):
             if args.fail_fast:
                 sys.exit(1)
 
-    # Лексический анализ
     scanner = Scanner(source)
     tokens = scanner.scan_tokens()
 
@@ -112,7 +108,6 @@ def run_parse(args):
         if args.fail_fast:
             sys.exit(1)
 
-    # Синтаксический анализ
     parser = Parser(tokens)
     ast = parser.parse()
 
@@ -121,20 +116,27 @@ def run_parse(args):
         if args.fail_fast:
             sys.exit(1)
 
-    # Семантический анализ (опционально)
     if args.semantic:
-        analyzer = ASTSemanticAnalyzer()
-        analyzer.visit(ast)
-        if analyzer.errors:
-            print_errors(analyzer.errors, "Ошибки семантического анализа:")
+        from src.semantic import SemanticAnalyzer
+        analyzer = SemanticAnalyzer(args.input)
+        analyzer.analyze(ast)
+        errors = analyzer.get_errors()
+
+        if errors:
+            print("\n" + analyzer.error_reporter.format_all(), file=sys.stderr)
             if args.fail_fast:
                 sys.exit(1)
 
-    # Вывод AST в выбранном формате
+        if args.verbose and not errors:
+            print("Семантических ошибок не обнаружено.")
+
     if args.format == "text":
         printer = ASTPrettyPrinter()
         printer.visit(ast)
         output = printer.get_result()
+
+        if args.semantic and args.show_types and 'analyzer' in dir():
+            output += "\n\n" + analyzer._format_type_report()
     elif args.format == "json":
         output = ast_to_json(ast)
     elif args.format == "dot":
@@ -143,12 +145,10 @@ def run_parse(args):
         print(f"Неизвестный формат вывода: {args.format}", file=sys.stderr)
         sys.exit(1)
 
-    # Сохранение или вывод
     if args.output:
         Path(args.output).write_text(output, encoding="utf-8")
         print(f"AST сохранен в {args.output}")
 
-        # Генерация PNG из DOT если запрошено
         if args.format == "dot" and args.png:
             try:
                 png_path = Path(args.png)
@@ -165,6 +165,68 @@ def run_parse(args):
                 print("Ошибка: Graphviz (dot) не найден. Установите Graphviz для генерации PNG.", file=sys.stderr)
     else:
         print(output)
+
+
+def run_semantic(args):
+
+    from src.semantic import SemanticAnalyzer
+
+    source = read_file(args.input)
+
+    # Preprocess if needed
+    if args.preprocess:
+        pp = Preprocessor(source)
+        source = pp.process()
+        if pp.errors:
+            print_errors(pp.errors, "Ошибки препроцессора:")
+            if args.fail_fast:
+                sys.exit(1)
+
+    # Lexical analysis
+    scanner = Scanner(source)
+    tokens = scanner.scan_tokens()
+
+    if scanner.get_errors():
+        print_errors(scanner.get_errors(), "Ошибки лексического анализа:")
+        if args.fail_fast:
+            sys.exit(1)
+
+    # Parsing
+    parser = Parser(tokens)
+    ast = parser.parse()
+
+    if parser.errors:
+        print_errors(parser.errors, "Ошибки синтаксического анализа:")
+        if args.fail_fast:
+            sys.exit(1)
+
+    # Semantic analysis
+    analyzer = SemanticAnalyzer(args.input)
+    analyzer.analyze(ast)
+    errors = analyzer.get_errors()
+
+    # Output
+    output_lines = []
+
+    if args.show_symbols:
+        output_lines.append(analyzer.symbol_table.dump())
+
+    if args.show_types:
+        output_lines.append(analyzer._format_type_report())
+
+    if args.output:
+        Path(args.output).write_text("\n".join(output_lines), encoding="utf-8")
+        print(f"Результат сохранен в {args.output}")
+    elif output_lines:
+        print("\n".join(output_lines))
+
+    # Report errors
+    if errors:
+        print("\n" + analyzer.error_reporter.format_all(), file=sys.stderr)
+        sys.exit(1)
+
+    if not errors and args.verbose:
+        print("Семантических ошибок не обнаружено.")
 
 
 def run_full(args):
@@ -207,12 +269,11 @@ def run_check(args):
         print_errors(errors)
         sys.exit(1)
 
-    print(" Лексических ошибок не обнаружено.")
+    print("Лексических ошибок не обнаружено.")
     print("Исходный код лексически корректен.")
 
 
 def run_spec():
-
     if SPEC_PATH.exists():
         print(SPEC_PATH.read_text(encoding="utf-8"))
     else:
@@ -224,7 +285,7 @@ def run_spec():
 def main():
     parser = argparse.ArgumentParser(
         prog="compiler",
-        description="MiniCompiler - Лексический и синтаксический анализатор для C-подобного языка",
+        description="MiniCompiler - Лексический, синтаксический и семантический анализатор",
         epilog="Для получения дополнительной информации смотрите docs/language_spec.md"
     )
 
@@ -256,7 +317,7 @@ def main():
                             help="Завершиться при первой ошибке")
     lex_parser.set_defaults(func=run_lex)
 
-    # Команда parse (НОВАЯ)
+    # Команда parse
     parse_parser = subparsers.add_parser(
         "parse",
         help="Запустить синтаксический анализ и построить AST"
@@ -270,9 +331,26 @@ def main():
                               help="Запустить препроцессор перед анализом")
     parse_parser.add_argument("--semantic", action="store_true",
                               help="Выполнить семантический анализ")
+    parse_parser.add_argument("--show-types", action="store_true",
+                              help="Показать аннотации типов")
+    parse_parser.add_argument("--verbose", "-v", action="store_true")
     parse_parser.add_argument("--fail-fast", action="store_true",
                               help="Завершиться при первой ошибке")
     parse_parser.set_defaults(func=run_parse)
+
+    # Команда semantic (НОВАЯ)
+    sem_parser = subparsers.add_parser(
+        "semantic",
+        help="Запустить семантический анализ"
+    )
+    sem_parser.add_argument("--input", required=True, help="Входной файл с исходным кодом")
+    sem_parser.add_argument("--output", help="Выходной файл для результатов")
+    sem_parser.add_argument("--show-symbols", action="store_true", help="Показать таблицу символов")
+    sem_parser.add_argument("--show-types", action="store_true", help="Показать аннотации типов")
+    sem_parser.add_argument("--preprocess", action="store_true")
+    sem_parser.add_argument("--verbose", "-v", action="store_true")
+    sem_parser.add_argument("--fail-fast", action="store_true")
+    sem_parser.set_defaults(func=run_semantic)
 
     # Команда full
     full_parser = subparsers.add_parser(
@@ -297,7 +375,6 @@ def main():
     )
     spec_parser.set_defaults(func=lambda args: run_spec())
 
-    # Парсинг и выполнение
     args = parser.parse_args()
     args.func(args)
 
