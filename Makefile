@@ -1,33 +1,39 @@
-.PHONY: help build install test clean lint format
-
-help:
-	@echo "Доступные команды:"
-	@echo "  make build    - сборка пакета"
-	@echo "  make install  - установка в режиме разработки"
-	@echo "  make test     - запуск тестов"
-	@echo "  make clean    - очистка временных файлов"
-	@echo "  make lint     - проверка кода"
-	@echo "  make format   - форматирование кода"
-
-build:
-	python -m build
+.PHONY: test test-lexer test-parser test-semantic test-semantic-valid test-semantic-invalid test-cli clean install
 
 install:
 	pip install -e .
 
-test:
-	python tests/run_tests.py
+test: test-lexer test-parser test-semantic test-cli
+	@echo "All tests passed!"
+
+test-lexer:
+	pytest tests/test_lexer.py -v
+
+test-parser:
+	pytest tests/parser/ -v
+
+test-semantic:
+	pytest tests/semantic/ -v
+
+test-semantic-valid:
+	pytest tests/semantic/test_valid_semantic.py tests/semantic/test_golden_valid.py -v
+
+test-semantic-invalid:
+	pytest tests/semantic/test_invalid_semantic.py tests/semantic/test_golden_invalid.py -v
+
+test-cli:
+	pytest tests/test_cli.py -v
 
 clean:
 	rm -rf build/
 	rm -rf dist/
-	rm -rf *.egg-info/
-	find . -type d -name __pycache__ -exec rm -rf {} +
+	rm -rf *.egg-info
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete
 
-lint:
-	flake8 src/ tests/
-	mypy src/
+# Semantic examples
+example-valid:
+	python -m src.cli semantic --input tests/semantic/valid/samples/valid_basic.src --show-symbols --show-types
 
-format:
-	black src/ tests/
+example-invalid:
+	python -m src.cli semantic --input tests/semantic/invalid/samples/argument_count.src --show-errors
