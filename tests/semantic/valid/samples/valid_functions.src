@@ -1,0 +1,19 @@
+fn add(int a, int b) -> int {
+    return a + b;
+}
+
+fn multiply(int a, int b) -> int {
+    int result = 0;
+    int i = 0;
+    while (i < b) {
+        result = result + a;
+        i = i + 1;
+    }
+    return result;
+}
+
+fn main() -> int {
+    int sum = add(5, 3);
+    int product = multiply(4, 2);
+    return sum + product;
+}

@@ -1,0 +1,9 @@
+fn main() -> int {
+    int x = 5;
+    bool b = true;
+
+    x++;
+    b++;
+
+    return x;
+}
