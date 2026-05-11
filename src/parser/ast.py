@@ -63,40 +63,40 @@ class FunctionDeclNode(DeclarationNode):
 
     def __init__(self, return_type, name, parameters, body, line, column):
         super().__init__(line, column)
-        self.return_type = return_type  # Токен типа
-        self.name = name  # Токен идентификатора
-        self.parameters = parameters  # Список ParamNode
-        self.body = body  # BlockStmtNode
+        self.return_type = return_type
+        self.name = name
+        self.parameters = parameters
+        self.body = body
 
 
 class StructDeclNode(DeclarationNode):
 
     def __init__(self, name, fields, line, column):
         super().__init__(line, column)
-        self.name = name  # Токен идентификатора
-        self.fields = fields  # Список VarDeclStmtNode
+        self.name = name
+        self.fields = fields
 
 
 class ParamNode(ASTNode):
 
     def __init__(self, type_, name, line, column):
         super().__init__(line, column)
-        self.type = type_  # Токен типа
-        self.name = name  # Токен идентификатора
+        self.type = type_
+        self.name = name
 
 
 class BlockStmtNode(StatementNode):
 
     def __init__(self, statements, line, column):
         super().__init__(line, column)
-        self.statements = statements  # Список StatementNode
+        self.statements = statements
 
 
 class ExprStmtNode(StatementNode):
 
     def __init__(self, expression, line, column):
         super().__init__(line, column)
-        self.expression = expression  # ExpressionNode
+        self.expression = expression
 
 
 class EmptyStmtNode(StatementNode):
@@ -109,101 +109,102 @@ class IfStmtNode(StatementNode):
 
     def __init__(self, condition, then_branch, else_branch, line, column):
         super().__init__(line, column)
-        self.condition = condition  # ExpressionNode
-        self.then_branch = then_branch  # StatementNode
-        self.else_branch = else_branch  # StatementNode или None
+        self.condition = condition
+        self.then_branch = then_branch
+        self.else_branch = else_branch
 
 
 class WhileStmtNode(StatementNode):
 
     def __init__(self, condition, body, line, column):
         super().__init__(line, column)
-        self.condition = condition  # ExpressionNode
-        self.body = body  # StatementNode
+        self.condition = condition
+        self.body = body
 
 
 class ForStmtNode(StatementNode):
 
     def __init__(self, init, condition, update, body, line, column):
         super().__init__(line, column)
-        self.init = init  # StatementNode или None
-        self.condition = condition  # ExpressionNode или None
-        self.update = update  # ExpressionNode или None
-        self.body = body  # StatementNode
+        self.init = init
+        self.condition = condition
+        self.update = update
+        self.body = body
 
 
 class ReturnStmtNode(StatementNode):
 
     def __init__(self, value, line, column):
         super().__init__(line, column)
-        self.value = value  # ExpressionNode или None
+        self.value = value
 
 
 class VarDeclStmtNode(StatementNode):
 
     def __init__(self, type_, name, initializer, line, column):
         super().__init__(line, column)
-        self.type = type_  # Токен типа
-        self.name = name  # Токен идентификатора
-        self.initializer = initializer  # ExpressionNode или None
+        self.type = type_
+        self.name = name
+        self.initializer = initializer
 
 
 class LiteralExprNode(ExpressionNode):
 
     def __init__(self, value, line, column):
         super().__init__(line, column)
-        self.value = value  # Значение (int, float, str, bool)
+        self.value = value
 
 
 class IdentifierExprNode(ExpressionNode):
 
     def __init__(self, name, line, column):
         super().__init__(line, column)
-        self.name = name  # Токен идентификатора
+        self.name = name
 
 
 class BinaryExprNode(ExpressionNode):
 
     def __init__(self, left, operator, right, line, column):
         super().__init__(line, column)
-        self.left = left  # ExpressionNode
-        self.operator = operator  # Токен оператора
-        self.right = right  # ExpressionNode
+        self.left = left
+        self.operator = operator
+        self.right = right
 
 
 class UnaryExprNode(ExpressionNode):
 
     def __init__(self, operator, operand, line, column):
         super().__init__(line, column)
-        self.operator = operator  # Токен оператора
-        self.operand = operand  # ExpressionNode
-        self.is_prefix = False  # Флаг префиксного оператора
-        self.is_postfix = False  # Флаг постфиксного оператора
+        self.operator = operator
+        self.operand = operand
+        self.is_prefix = False
+        self.is_postfix = False
 
 
 class AssignmentExprNode(ExpressionNode):
 
     def __init__(self, target, operator, value, line, column):
         super().__init__(line, column)
-        self.target = target  # ExpressionNode (должен быть Identifier или StructAccess)
-        self.operator = operator  # Токен оператора присваивания
-        self.value = value  # ExpressionNode
+        self.target = target
+        self.operator = operator
+        self.value = value
 
 
 class CallExprNode(ExpressionNode):
 
     def __init__(self, callee, arguments, line, column):
         super().__init__(line, column)
-        self.callee = callee  # ExpressionNode (обычно Identifier)
-        self.arguments = arguments  # Список ExpressionNode
+        self.callee = callee
+        self.arguments = arguments
 
 
 class StructAccessExprNode(ExpressionNode):
 
     def __init__(self, primary, field, line, column):
         super().__init__(line, column)
-        self.primary = primary  # ExpressionNode
-        self.field = field  # Токен идентификатора
+        self.primary = primary
+        self.field = field
+
 
 def expr_to_str(expr):
     if expr is None:
@@ -344,82 +345,150 @@ def generate_dot(ast):
     lines = [
         "digraph AST {",
         '  rankdir=TB;',
-        '  node [shape=box, style="rounded,filled", fontname="Arial"];'
+        '  node [shape=box, style="rounded,filled", fontname="Arial", fontsize=12];',
+        '  edge [fontname="Arial", fontsize=10, color="gray40"];'
     ]
 
     def node_style(node):
         if isinstance(node, DeclarationNode):
-            return "#D6EAF8"   # голубой
+            return "#D6EAF8"
         if isinstance(node, StatementNode):
-            return "#D5F5E3"   # зелёный
+            return "#D5F5E3"
         if isinstance(node, ExpressionNode):
-            return "#FADBD8"   # розовый
-        return "#F2F3F4"       # серый
-
-    visited = set()
+            return "#FADBD8"
+        return "#F2F3F4"
 
     def escape(s):
-        return str(s).replace("\\", "\\\\").replace('"', '\\"')
+        return str(s).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+    def get_location(node):
+        if hasattr(node, 'line') and hasattr(node, 'column'):
+            if hasattr(node, 'end_line') and hasattr(node, 'end_column'):
+                return f"[{node.line}:{node.column} - {node.end_line}:{node.end_column}]"
+            else:
+                return f"[строка {node.line}, колонка {node.column}]"
+        return ""
 
     def make_label(node):
         label = node.__class__.__name__
+        pos = get_location(node)
 
         if isinstance(node, FunctionDeclNode):
             ret = node.return_type.lexeme if node.return_type else "void"
             label += f"\\n{node.name.lexeme} -> {ret}"
+            if pos:
+                label += f"\\n{pos}"
         elif isinstance(node, StructDeclNode):
             label += f"\\n{node.name.lexeme}"
+            if pos:
+                label += f"\\n{pos}"
         elif isinstance(node, ParamNode):
             label += f"\\n{node.type.lexeme} {node.name.lexeme}"
+            if pos:
+                label += f"\\n{pos}"
         elif isinstance(node, VarDeclStmtNode):
             label += f"\\n{node.type.lexeme} {node.name.lexeme}"
+            if node.initializer:
+                label += f"\\n= ..."
+            if pos:
+                label += f"\\n{pos}"
         elif isinstance(node, IdentifierExprNode):
             label += f"\\n{node.name.lexeme}"
+            if pos:
+                label += f"\\n{pos}"
         elif isinstance(node, LiteralExprNode):
-            label += f"\\n{node.value}"
+            if isinstance(node.value, str):
+                label += f'\\n"{node.value}"'
+            elif isinstance(node.value, bool):
+                label += f"\\n{'true' if node.value else 'false'}"
+            else:
+                label += f"\\n{node.value}"
+            if pos:
+                label += f"\\n{pos}"
         elif isinstance(node, BinaryExprNode):
-            label += f"\\n{node.operator.lexeme}"
+            op = node.operator.lexeme
+            if op == "&&":
+                op = "∧"
+            elif op == "||":
+                op = "∨"
+            elif op == "!=":
+                op = "≠"
+            elif op == "<=":
+                op = "≤"
+            elif op == ">=":
+                op = "≥"
+            label += f"\\n{op}"
+            if pos:
+                label += f"\\n{pos}"
         elif isinstance(node, UnaryExprNode):
             op = node.operator.lexeme
             if hasattr(node, "is_postfix") and node.is_postfix:
-                label += f"\\npostfix {op}"
+                label += f"\\n{op} (постфикс)"
             else:
-                label += f"\\nprefix {op}"
+                label += f"\\n{op} (префикс)"
+            if pos:
+                label += f"\\n{pos}"
         elif isinstance(node, AssignmentExprNode):
             label += f"\\n{node.operator.lexeme}"
+            if pos:
+                label += f"\\n{pos}"
         elif isinstance(node, StructAccessExprNode):
             label += f"\\n.{node.field.lexeme}"
+            if pos:
+                label += f"\\n{pos}"
+        elif isinstance(node, IfStmtNode):
+            label += "\\nif"
+            if pos:
+                label += f"\\n{pos}"
+        elif isinstance(node, WhileStmtNode):
+            label += "\\nwhile"
+            if pos:
+                label += f"\\n{pos}"
+        elif isinstance(node, ForStmtNode):
+            label += "\\nfor"
+            if pos:
+                label += f"\\n{pos}"
+        elif isinstance(node, ReturnStmtNode):
+            label += "\\nreturn"
+            if pos:
+                label += f"\\n{pos}"
+        elif isinstance(node, BlockStmtNode):
+            label += "\\n{ ... }"
+            if pos:
+                label += f"\\n{pos}"
+        else:
+            if pos:
+                label += f"\\n{pos}"
 
         return escape(label)
 
-    def visit(node):
+    visited = set()
+
+    def visit(node, parent_id=None, edge_label=None):
         if node is None:
             return
 
         node_id = f"n{id(node)}"
-        if node_id in visited:
-            return
-        visited.add(node_id)
+        if node_id not in visited:
+            visited.add(node_id)
+            lines.append(
+                f'  {node_id} [label="{make_label(node)}", fillcolor="{node_style(node)}"];'
+            )
 
-        lines.append(
-            f'  {node_id} [label="{make_label(node)}", fillcolor="{node_style(node)}"];'
-        )
+        if parent_id is not None and edge_label is not None:
+            lines.append(f'  {parent_id} -> {node_id} [label="{edge_label}"];')
 
         for attr_name, attr in node.__dict__.items():
-            if attr_name in ("line", "column"):
+            if attr_name in ("line", "column", "end_line", "end_column"):
                 continue
 
             if isinstance(attr, ASTNode):
-                child_id = f"n{id(attr)}"
-                visit(attr)
-                lines.append(f'  {node_id} -> {child_id} [label="{attr_name}"];')
+                visit(attr, node_id, attr_name)
 
             elif isinstance(attr, list):
                 for idx, item in enumerate(attr):
                     if isinstance(item, ASTNode):
-                        child_id = f"n{id(item)}"
-                        visit(item)
-                        lines.append(f'  {node_id} -> {child_id} [label="{attr_name}[{idx}]"];')
+                        visit(item, node_id, f"{attr_name}[{idx}]")
 
     visit(ast)
     lines.append("}")
@@ -505,3 +574,83 @@ def ast_to_code(ast):
         return f"{ast_to_code(ast.primary)}.{ast.field.lexeme}"
 
     return ""
+
+
+
+
+class TypedNode:
+
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._inferred_type = None
+        self._symbol_ref = None
+        self._constant_value = None
+
+    @property
+    def inferred_type(self):
+        return self._inferred_type
+
+    @inferred_type.setter
+    def inferred_type(self, value):
+        self._inferred_type = value
+
+    @property
+    def symbol(self):
+        return self._symbol_ref
+
+    @symbol.setter
+    def symbol(self, value):
+        self._symbol_ref = value
+
+    @property
+    def constant_value(self):
+        return self._constant_value
+
+    @constant_value.setter
+    def constant_value(self, value):
+        self._constant_value = value
+
+
+
+def _apply_typed_mixin(cls):
+    if not hasattr(cls, '_typed_mixin_applied'):
+
+        original_init = getattr(cls, '__init__', None)
+
+
+        cls.inferred_type = property(
+            lambda self: self._inferred_type if hasattr(self, '_inferred_type') else None,
+            lambda self, v: setattr(self, '_inferred_type', v)
+        )
+        cls.symbol = property(
+            lambda self: self._symbol_ref if hasattr(self, '_symbol_ref') else None,
+            lambda self, v: setattr(self, '_symbol_ref', v)
+        )
+        cls.constant_value = property(
+            lambda self: self._constant_value if hasattr(self, '_constant_value') else None,
+            lambda self, v: setattr(self, '_constant_value', v)
+        )
+
+
+        def new_init(self, *args, **kwargs):
+            if original_init and original_init is not object.__init__:
+                original_init(self, *args, **kwargs)
+            self._inferred_type = None
+            self._symbol_ref = None
+            self._constant_value = None
+
+        cls.__init__ = new_init
+        cls._typed_mixin_applied = True
+    return cls
+
+
+
+for node_class in [
+    ProgramNode, FunctionDeclNode, StructDeclNode, ParamNode,
+    BlockStmtNode, ExprStmtNode, EmptyStmtNode, IfStmtNode,
+    WhileStmtNode, ForStmtNode, ReturnStmtNode, VarDeclStmtNode,
+    LiteralExprNode, IdentifierExprNode, BinaryExprNode,
+    UnaryExprNode, AssignmentExprNode, CallExprNode, StructAccessExprNode
+]:
+    _apply_typed_mixin(node_class)
