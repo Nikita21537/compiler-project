@@ -316,7 +316,7 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_BlockStmtNode(self, node: BlockStmtNode):
         self.symbol_table.enter_scope("block", ScopeKind.BLOCK)
         self._predeclare_block_variables(node.statements)
-        self._walk_block_statements(node.statements)  # ИСПРАВЛЕНО: добавлен вызов
+        self._walk_block_statements(node.statements) 
         self.symbol_table.exit_scope()
 
     def visit_VarDeclStmtNode(self, node: VarDeclStmtNode):
