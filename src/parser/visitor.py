@@ -1,3 +1,4 @@
+# src/parser/visitor.py
 from src.parser.ast import *
 
 
@@ -216,8 +217,8 @@ class ASTSemanticAnalyzer(ASTVisitor):
     def __init__(self):
         self.errors = []
         self.current_function = None
-        self.variables = []  # Scope stack
-        self.functions = {}  # Function table
+        self.variables = []
+        self.functions = {}
 
     def visit_ProgramNode(self, node):
         for decl in node.declarations:

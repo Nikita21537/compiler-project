@@ -1,9 +1,9 @@
 import argparse
 import sys
 import subprocess
+import json
 from pathlib import Path
 from typing import List, Optional
-
 
 from src.lexer.scanner import Scanner
 from src.lexer.token import TokenType
@@ -39,6 +39,36 @@ def print_errors(errors, title="Ошибки:") -> bool:
                 print(error, file=sys.stderr)
         return True
     return False
+
+
+def ir_to_dot(program) -> str:
+    lines = [
+        "digraph CFG {",
+        '  rankdir=TB;',
+        '  node [shape=box, style="rounded,filled", fontname="Arial", fillcolor="#D6EAF8"];',
+        '  edge [fontname="Arial", fontsize=10, color="gray40"];',
+    ]
+
+    for func in program.functions:
+        lines.append(f'  subgraph cluster_{func.name} {{')
+        lines.append(f'    label="{func.name}";')
+        lines.append(f'    style=filled;')
+        lines.append(f'    fillcolor="#F2F3F4";')
+
+        for block in func.blocks:
+            label = block.label.replace('"', '\\"')
+            # Show instruction count in node
+            instr_count = len(block.instructions)
+            lines.append(f'    "{label}" [label="{label}\\n{instr_count} instr"];')
+
+        for block in func.blocks:
+            for succ in block.successors:
+                lines.append(f'    "{block.label}" -> "{succ}";')
+
+        lines.append('  }')
+
+    lines.append("}")
+    return "\n".join(lines)
 
 
 def run_preprocess(args):
@@ -119,7 +149,7 @@ def run_parse(args):
     if args.semantic:
         from src.semantic import SemanticAnalyzer
         analyzer = SemanticAnalyzer(args.input)
-        analyzer.analyze(ast)
+        analyzer.analyze(ast, source)
         errors = analyzer.get_errors()
 
         if errors:
@@ -168,13 +198,12 @@ def run_parse(args):
 
 
 def run_semantic(args):
-
     from src.semantic import SemanticAnalyzer
 
     source = read_file(args.input)
 
-    # Preprocess if needed
     if args.preprocess:
+        from src.preprocessor.preprocessor import Preprocessor
         pp = Preprocessor(source)
         source = pp.process()
         if pp.errors:
@@ -182,7 +211,6 @@ def run_semantic(args):
             if args.fail_fast:
                 sys.exit(1)
 
-    # Lexical analysis
     scanner = Scanner(source)
     tokens = scanner.scan_tokens()
 
@@ -191,7 +219,6 @@ def run_semantic(args):
         if args.fail_fast:
             sys.exit(1)
 
-    # Parsing
     parser = Parser(tokens)
     ast = parser.parse()
 
@@ -200,12 +227,11 @@ def run_semantic(args):
         if args.fail_fast:
             sys.exit(1)
 
-    # Semantic analysis
     analyzer = SemanticAnalyzer(args.input)
-    analyzer.analyze(ast)
+    analyzer.analyze(ast, source)
+
     errors = analyzer.get_errors()
 
-    # Output
     output_lines = []
 
     if args.show_symbols:
@@ -220,13 +246,110 @@ def run_semantic(args):
     elif output_lines:
         print("\n".join(output_lines))
 
-    # Report errors
     if errors:
-        print("\n" + analyzer.error_reporter.format_all(), file=sys.stderr)
+        print(analyzer.error_reporter.format_all())
         sys.exit(1)
 
     if not errors and args.verbose:
         print("Семантических ошибок не обнаружено.")
+
+
+def run_ir(args):
+    from src.semantic import SemanticAnalyzer
+    from src.ir import IRGenerator, IRValidator
+
+    source = read_file(args.input)
+
+
+    if args.preprocess:
+        pp = Preprocessor(source)
+        source = pp.process()
+        if pp.errors:
+            print_errors(pp.errors, "Ошибки препроцессора:")
+            if args.fail_fast:
+                sys.exit(1)
+
+
+    scanner = Scanner(source)
+    tokens = scanner.scan_tokens()
+
+    if scanner.get_errors():
+        print_errors(scanner.get_errors(), "Ошибки лексического анализа:")
+        if args.fail_fast:
+            sys.exit(1)
+
+
+    parser = Parser(tokens)
+    ast = parser.parse()
+
+    if parser.errors:
+        print_errors(parser.errors, "Ошибки синтаксического анализа:")
+        if args.fail_fast:
+            sys.exit(1)
+
+
+    analyzer = SemanticAnalyzer(args.input)
+    analyzer.analyze(ast, source)
+
+    errors = analyzer.get_errors()
+    if errors:
+        print(analyzer.error_reporter.format_all())
+        if args.fail_fast:
+            sys.exit(1)
+
+
+    ir_gen = IRGenerator(analyzer.symbol_table)
+    program = ir_gen.generate(ast)
+
+
+    if args.validate:
+        validator = IRValidator(program)
+        result = validator.validate()
+        if not result.is_valid():
+            print("IR validation errors:", file=sys.stderr)
+            for err in result.errors:
+                print(f"  {err}", file=sys.stderr)
+            if args.fail_fast:
+                sys.exit(1)
+        elif args.verbose:
+            print("IR validation passed.")
+
+    output = ""
+    if args.format == "text":
+        output = program.to_text()
+    elif args.format == "json":
+        output = json.dumps(program.to_json(), indent=2, ensure_ascii=False)
+    elif args.format == "dot":
+        output = ir_to_dot(program)
+    else:
+        print(f"Неизвестный формат вывода: {args.format}", file=sys.stderr)
+        sys.exit(1)
+
+
+    if args.stats:
+        stats = program.get_statistics()
+        stats_output = "\n".join(f"  {k}: {v}" for k, v in stats.items())
+        output = f"IR Statistics:\n{stats_output}\n\n{output}"
+
+
+    if args.output:
+        Path(args.output).write_text(output, encoding="utf-8")
+        print(f"IR сохранен в {args.output}")
+
+        if args.format == "dot" and args.png:
+            try:
+                png_path = Path(args.png)
+                subprocess.run(
+                    ["dot", "-Tpng", args.output, "-o", str(png_path)],
+                    check=True, capture_output=True, text=True
+                )
+                print(f"PNG изображение сохранено в {png_path}")
+            except subprocess.CalledProcessError as e:
+                print(f"Ошибка при генерации PNG: {e.stderr}", file=sys.stderr)
+            except FileNotFoundError:
+                print("Ошибка: Graphviz (dot) не найден. Установите Graphviz для генерации PNG.", file=sys.stderr)
+    else:
+        print(output)
 
 
 def run_full(args):
@@ -285,7 +408,7 @@ def run_spec():
 def main():
     parser = argparse.ArgumentParser(
         prog="compiler",
-        description="MiniCompiler - Лексический, синтаксический и семантический анализатор",
+        description="MiniCompiler - Лексический, синтаксический, семантический анализатор и генератор IR",
         epilog="Для получения дополнительной информации смотрите docs/language_spec.md"
     )
 
@@ -338,7 +461,7 @@ def main():
                               help="Завершиться при первой ошибке")
     parse_parser.set_defaults(func=run_parse)
 
-    # Команда semantic (НОВАЯ)
+    # Команда semantic
     sem_parser = subparsers.add_parser(
         "semantic",
         help="Запустить семантический анализ"
@@ -351,6 +474,26 @@ def main():
     sem_parser.add_argument("--verbose", "-v", action="store_true")
     sem_parser.add_argument("--fail-fast", action="store_true")
     sem_parser.set_defaults(func=run_semantic)
+
+    # Команда ir (НОВАЯ для Sprint 4)
+    ir_parser = subparsers.add_parser(
+        "ir",
+        help="Сгенерировать промежуточное представление (IR)"
+    )
+    ir_parser.add_argument("--input", required=True, help="Входной файл с исходным кодом")
+    ir_parser.add_argument("--output", help="Выходной файл для IR")
+    ir_parser.add_argument("--format", choices=["text", "json", "dot"], default="text",
+                           help="Формат вывода: text (по умолчанию), json, dot")
+    ir_parser.add_argument("--png", help="Сгенерировать PNG из DOT (требуется Graphviz)")
+    ir_parser.add_argument("--preprocess", action="store_true",
+                           help="Запустить препроцессор перед анализом")
+    ir_parser.add_argument("--validate", action="store_true",
+                           help="Проверить корректность сгенерированного IR")
+    ir_parser.add_argument("--stats", action="store_true",
+                           help="Показать статистику IR")
+    ir_parser.add_argument("--verbose", "-v", action="store_true")
+    ir_parser.add_argument("--fail-fast", action="store_true")
+    ir_parser.set_defaults(func=run_ir)
 
     # Команда full
     full_parser = subparsers.add_parser(

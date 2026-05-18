@@ -32,18 +32,19 @@ class SemanticAnalyzer(ASTVisitor):
         self.file_name = file_name
         self.symbol_table = SymbolTable()
         self.error_reporter = SemanticErrorReporter(file_name)
-
         self.current_function = None
         self.current_function_return_type: Optional[Type] = None
         self.current_stack_offset = 0
-
         self.loop_depth = 0
         self.current_statement_index = -1
-
         self.decorated_ast = None
 
-    def analyze(self, ast: ProgramNode) -> ProgramNode:
+    def analyze(self, ast: ProgramNode, source: str = "") -> ProgramNode:
         self.decorated_ast = ast
+
+        # Set source code for error reporting
+        if source:
+            self.error_reporter.set_source(source)
 
         self._declare_builtin_functions()
         self._collect_global_declarations(ast)
@@ -316,7 +317,7 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_BlockStmtNode(self, node: BlockStmtNode):
         self.symbol_table.enter_scope("block", ScopeKind.BLOCK)
         self._predeclare_block_variables(node.statements)
-        self._walk_block_statements(node.statements) 
+        self._walk_block_statements(node.statements)  # ИСПРАВЛЕНО: добавлен вызов
         self.symbol_table.exit_scope()
 
     def visit_VarDeclStmtNode(self, node: VarDeclStmtNode):
