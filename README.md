@@ -389,7 +389,7 @@ python -m src.cli parse --input examples/comments.src --preprocess
 
 ### Примеры семантических ошибок
 
-
+~~~
 semantic error: undeclared identifier 'unknown_var'
   --> examples/error.src:5:12
    |
@@ -421,7 +421,7 @@ semantic error: struct 'Point' has no field 'z'
 12 |     p.z = 10;
    |         ^
    = context: in function 'main'
-
+~~~
 
 ---
 
@@ -514,7 +514,7 @@ pytest tests/semantic/test_invalid_semantic.py::TestInvalidPrograms::test_undecl
 
 # Запустить с покрытием
 pytest --cov=src tests/
-text
+
 
 ---
 
@@ -537,7 +537,7 @@ markdown
 
 ### Входной код (examples/factorial.src)
 
-
+~~~
 fn factorial(int n) -> int {
     int result = 1;
     while (n > 1) {
@@ -546,8 +546,9 @@ fn factorial(int n) -> int {
     }
     return result;
 }
+~~~
 Вывод таблицы символов
-
+~~~
 $ python -m src.cli semantic --input examples/factorial.src --show-symbols
 
 Symbol Table:
@@ -557,10 +558,11 @@ Symbol Table:
   Scope 'factorial' (function, depth=1)
     - parameter n, type=int, declared at 1:14
     - variable result, type=int, offset=0, size=4, align=4, declared at 2:9
+~~~
 Вывод аннотаций типов
 
 $ python -m src.cli semantic --input examples/factorial.src --show-types
-
+~~~
 Line 1:14 ParamNode -> int
 Line 2:9 VarDeclStmtNode -> int
 Line 2:13 LiteralExprNode -> int, const=1
@@ -579,7 +581,7 @@ Line 5:20 IdentifierExprNode -> int, symbol=n
 Line 5:24 LiteralExprNode -> int, const=1
 Line 6:12 ReturnStmtNode -> int
 Line 6:12 IdentifierExprNode -> int, symbol=result
-text
+~~~
 
 ---
 
@@ -663,7 +665,7 @@ python -m src.cli ir --input examples/factorial.src --validate
 ### Примеры IR
 
 **Входной код** (`examples/factorial.src`):
-
+~~~
 fn factorial(int n) -> int {
     if (n <= 1) {
         return 1;
@@ -671,8 +673,9 @@ fn factorial(int n) -> int {
         return n * factorial(n - 1);
     }
 }
+~~~
 Вывод IR:
-
+~~~
 asm
 function factorial: int (int n)
   entry:
@@ -687,7 +690,7 @@ function factorial: int (int n)
     t3 = CALL factorial
     t4 = MUL n, t3
     RETURN t4
-
+~~~
 
 ## 5. Обновите структуру проекта:
 
