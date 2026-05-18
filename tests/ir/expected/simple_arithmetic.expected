@@ -1,0 +1,18 @@
+function main: int ()
+  # Variable map:
+  #   x -> x
+  #   y -> y
+  #   z -> z
+  # Locals: x, y, z
+  entry:
+    x = ALLOCA 4    # allocate x
+    STORE x, 5    # initialize x
+    y = ALLOCA 4    # allocate y
+    STORE y, 10    # initialize y
+    z = ALLOCA 4    # allocate z
+    t1 = LOAD x    # load x
+    t2 = LOAD y    # load y
+    t3 = ADD t1, t2    # + expression
+    STORE z, t3    # initialize z
+    t4 = LOAD z    # load z
+    RETURN t4    # return

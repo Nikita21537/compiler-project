@@ -1,0 +1,13 @@
+function add: int (int a, int b)
+  entry:
+    t1 = LOAD a    # load a
+    t2 = LOAD b    # load b
+    t3 = ADD t1, t2    # + expression
+    RETURN t3    # return
+
+function main: int ()
+  entry:
+    PARAM 0, 5    # param 0
+    PARAM 1, 3    # param 1
+    t1 = CALL add    # call add
+    RETURN t1    # return
