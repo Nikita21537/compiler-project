@@ -44,7 +44,7 @@ void, struct, fn, string
 
 ### Грамматика в EBNF
 
-
+~~~
 Program        ::= { Declaration }
 Declaration    ::= FunctionDecl | StructDecl | VarDecl
 FunctionDecl   ::= "fn" Identifier "(" [ Parameters ] ")" [ "->" Type ] Block
@@ -71,6 +71,7 @@ Multiplicative ::= Unary { ("*" | "/" | "%") Unary }
 Unary          ::= [ "-" | "!" | "++" | "--" ] Primary
 Primary        ::= Literal | Identifier | "(" Expression ")" | Call
 Call           ::= Identifier "(" [ Arguments ] ")"
+~~~
 Таблица приоритетов операторов
 Приоритет	Операторы	Ассоциативность
 1 (высш.)	() .	Левая
@@ -86,6 +87,7 @@ Call           ::= Identifier "(" [ Arguments ] ")"
 11 (низш.)	= += -= *= /=	Правая
 ## Структура проекта
 ##
+~~~
 #compiler-project/
 ├── docs/
 │   ├── language_spec.md           Лексическая спецификация
@@ -122,6 +124,7 @@ Call           ::= Identifier "(" [ Arguments ] ")"
 ├── Makefile
 ├── setup.py
 └── README.md
+~~~
 ##
 Требования
 Python 3.8 или выше
