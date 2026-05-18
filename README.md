@@ -584,7 +584,7 @@ text
 
 
 ### Команды CLI (полный список)
-
+~~~
 | Команда | Описание |
 |---------|----------|
 | `lex` | Лексический анализ |
@@ -594,8 +594,115 @@ text
 | `check` | Проверка лексических ошибок |
 | `full` | Полный цикл: препроцессор + лексер |
 | `spec` | Показать спецификацию языка |
+~~~
 # 3. Создай релизный тег
 git add .
 git commit -m "Sprint 8: Final release v1.0.0 with full demo, performance tests, and documentation"
 git tag -a v1.0.0 -m "MicroPKI Release 1.0.0 - Complete PKI implementation"
 git push origin main --tags
+### Генерация промежуточного представления (IR) (Спринт 4)
+- Генерация трехадресного кода (TAC) из decorated AST
+- Поддержка всех инструкций IR: арифметические, логические, сравнения, работа с памятью, управление потоком
+- Basic Block структура с Control Flow Graph (CFG)
+- PHI-узлы для слияния значений в точках соединения
+- Валидатор IR для проверки корректности
+- Вывод IR в текстовом, JSON и Graphviz DOT форматах
+- Статистика IR (количество инструкций, блоков, временных переменных)
+- Интеграция с таблицей символов для информации о типах и размерах
+2. Добавьте новый раздел "IR Generation" в секцию "Использование":
+
+### Генерация промежуточного представления (IR)
+
+Вывод IR в текстовом формате
+
+python -m src.cli ir --input examples/factorial.src
+Сохранить IR в файл
+
+
+python -m src.cli ir --input examples/factorial.src --output out.ir
+Генерация JSON
+
+
+python -m src.cli ir --input examples/factorial.src --format json --output ir.json
+Генерация Graphviz DOT для визуализации CFG
+
+
+python -m src.cli ir --input examples/factorial.src --format dot --output cfg.dot
+Генерация PNG изображения CFG (требуется Graphviz)
+
+
+python -m src.cli ir --input examples/factorial.src --format dot --output cfg.dot --png cfg.png
+Показать статистику IR
+
+
+python -m src.cli ir --input examples/factorial.src --stats
+Валидация IR
+
+
+python -m src.cli ir --input examples/factorial.src --validate
+
+
+## 3. Добавьте новые команды в таблицу CLI:
+
+~~~
+| Команда | Описание |
+|---------|----------|
+| lex | Лексический анализ |
+| parse | Синтаксический анализ (построение AST) |
+| semantic | Семантический анализ |
+| **ir** | **Генерация промежуточного представления (НОВОЕ)** |
+| preprocess | Препроцессор (удаление комментариев) |
+| check | Проверка лексических ошибок |
+| full | Полный цикл: препроцессор + лексер |
+| spec | Показать спецификацию языка |
+4. Добавьте новый раздел "Примеры IR":
+~~~
+### Примеры IR
+
+**Входной код** (`examples/factorial.src`):
+
+fn factorial(int n) -> int {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    }
+}
+Вывод IR:
+
+asm
+function factorial: int (int n)
+  entry:
+    t1 = CMP_LE n, 1
+    JUMP_IF_NOT t1, else1
+    JUMP then1
+  then1:
+    RETURN 1
+  else1:
+    t2 = SUB n, 1
+    PARAM 0, t2
+    t3 = CALL factorial
+    t4 = MUL n, t3
+    RETURN t4
+
+
+## 5. Обновите структуру проекта:
+
+~~~
+├── src/
+│   ├── lexer/               # Спринт 1
+│   ├── parser/              # Спринт 2
+│   ├── semantic/            # Спринт 3
+│   ├── ir/                  # Спринт 4 (НОВОЕ)
+│   │   ├── ir_generator.py
+│   │   ├── ir_instructions.py
+│   │   ├── basic_block.py
+│   │   ├── control_flow.py
+│   │   └── validator.py
+│   ├── preprocessor/
+│   └── cli.py
+~~~
+6. Обновите раздел тестирования:
+Запустить только тесты IR 
+
+pytest tests/ir/ -v
