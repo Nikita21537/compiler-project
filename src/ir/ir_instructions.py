@@ -6,7 +6,6 @@ from typing import Any, List, Optional
 
 
 class IROpcode(Enum):
-
     ADD = auto()
     SUB = auto()
     MUL = auto()
@@ -14,12 +13,10 @@ class IROpcode(Enum):
     MOD = auto()
     NEG = auto()
 
-
     AND = auto()
     OR = auto()
     NOT = auto()
     XOR = auto()
-
 
     CMP_EQ = auto()
     CMP_NE = auto()
@@ -28,20 +25,19 @@ class IROpcode(Enum):
     CMP_GT = auto()
     CMP_GE = auto()
 
-
     LOAD = auto()
     STORE = auto()
     ALLOCA = auto()
     MOVE = auto()
     GEP = auto()
-
+    MEMCPY = auto()   # Добавить
+    ADDR_OF = auto()  # Добавить
 
     LABEL = auto()
     JUMP = auto()
     JUMP_IF = auto()
     JUMP_IF_NOT = auto()
     PHI = auto()
-
 
     PARAM = auto()
     CALL = auto()
@@ -64,16 +60,16 @@ class IROperand:
 
     def __str__(self) -> str:
         if self.kind == IROperandKind.MEMORY:
-            # Memory operands are printed with brackets
             return f"[{self.value}]"
+
         if self.kind == IROperandKind.LITERAL:
             if isinstance(self.value, str):
                 if self.value.startswith("(") and self.value.endswith(")"):
-                    # PHI argument format (value, block)
                     return self.value
             if isinstance(self.value, bool):
                 return "true" if self.value else "false"
             return str(self.value)
+
         return str(self.value)
 
     def to_json(self) -> dict:
@@ -102,13 +98,11 @@ class IRInstruction:
     def to_text(self) -> str:
         op = self.opcode.name
 
-
         if self.opcode == IROpcode.LABEL:
             if not self.args:
                 raise ValueError("LABEL instruction requires one label operand")
             return f"{self.args[0]}:"
 
-        # Normal instruction with dest
         if self.dest is not None:
             if self.args:
                 base = f"{self.dest} = {op} " + ", ".join(str(arg) for arg in self.args)

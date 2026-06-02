@@ -8,23 +8,19 @@ from src.ir.ir_instructions import IRInstruction
 
 @dataclass
 class BasicBlock:
-
     label: str
     instructions: List[IRInstruction] = field(default_factory=list)
     successors: List[str] = field(default_factory=list)
     predecessors: List[str] = field(default_factory=list)
 
     def add_instruction(self, instruction: IRInstruction) -> None:
-
         self.instructions.append(instruction)
 
     def add_successor(self, label: str) -> None:
-
         if label not in self.successors:
             self.successors.append(label)
 
     def add_predecessor(self, label: str) -> None:
-
         if label not in self.predecessors:
             self.predecessors.append(label)
 
@@ -61,7 +57,6 @@ class IRFunction:
     local_variables: List[str] = field(default_factory=list)
     blocks: List[BasicBlock] = field(default_factory=list)
     variable_map: Dict[str, str] = field(default_factory=dict)
-
 
     temp_counter: int = 0
     label_counter: int = 0
@@ -100,7 +95,6 @@ class IRFunction:
         to_block.add_predecessor(from_label)
 
     def to_text(self) -> str:
-
         params_repr = []
         for i, pname in enumerate(self.params):
             if i < len(self.param_types):
@@ -110,7 +104,6 @@ class IRFunction:
 
         lines = [f"function {self.name}: {self.return_type} ({', '.join(params_repr)})"]
 
-
         if self.variable_map:
             lines.append("  # Variable map:")
             for src_name, ir_name in self.variable_map.items():
@@ -118,7 +111,6 @@ class IRFunction:
 
         if self.local_variables:
             lines.append("  # Locals: " + ", ".join(self.local_variables))
-
 
         for block in self.blocks:
             lines.append(block.to_text())
@@ -178,7 +170,7 @@ class IRProgram:
 
         if self.functions:
             if parts:
-                parts.append("")  # Empty line separator
+                parts.append("")
             parts.append("\n\n".join(function.to_text() for function in self.functions))
 
         if not parts:
