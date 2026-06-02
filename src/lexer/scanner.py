@@ -1,5 +1,5 @@
 from typing import List, Optional, Any
-from .token import TokenType, Token
+from .tokens import TokenType, Token
 
 
 class Scanner:
@@ -19,6 +19,7 @@ class Scanner:
         'string': TokenType.KW_STRING,
         'true': TokenType.BOOL_LITERAL,
         'false': TokenType.BOOL_LITERAL,
+        'null': TokenType.NULL_LITERAL,
     }
 
     def __init__(self, source: str):
@@ -106,7 +107,6 @@ class Scanner:
                 self.line += 1
                 self.column = 1
 
-            # Разделители
             case '(':
                 self.add_token(TokenType.LPAREN)
             case ')':
@@ -125,101 +125,76 @@ class Scanner:
                 self.add_token(TokenType.SEMICOLON)
             case ':':
                 self.add_token(TokenType.COLON)
-            case '.':
-                self.add_token(TokenType.DOT)  # Точка для доступа к полям
 
-            # Арифметические операторы
+            case '.':
+                self.add_token(TokenType.DOT)
             case '+':
                 if self.match('+'):
-                    self.add_token(TokenType.INCREMENT)  # ++
+                    self.add_token(TokenType.INCREMENT)
                 elif self.match('='):
-                    self.add_token(TokenType.PLUS_ASSIGN)  # +=
+                    self.add_token(TokenType.PLUS_ASSIGN)
                 else:
                     self.add_token(TokenType.PLUS)
-
             case '-':
                 if self.match('>'):
-                    self.add_token(TokenType.ARROW)  # ->
-                elif self.match('='):
-                    self.add_token(TokenType.MINUS_ASSIGN)  # -=
+                    self.add_token(TokenType.ARROW)
                 elif self.match('-'):
-                    self.add_token(TokenType.DECREMENT)  # --
-                elif self.peek().isdigit():
-                    self.number()  # отрицательное число
+                    self.add_token(TokenType.DECREMENT)
+                elif self.match('='):
+                    self.add_token(TokenType.MINUS_ASSIGN)
                 else:
                     self.add_token(TokenType.MINUS)
 
             case '*':
-                if self.match('='):
-                    self.add_token(TokenType.STAR_ASSIGN)  # *=
-                else:
-                    self.add_token(TokenType.STAR)
+                self.add_token(TokenType.STAR_ASSIGN if self.match('=') else TokenType.STAR)
 
             case '/':
                 if self.match('/'):
-                    # Однострочный комментарий
                     while not self.is_at_end() and self.peek() not in '\r\n':
                         self.advance()
                 elif self.match('*'):
                     self.block_comment()
                 elif self.match('='):
-                    self.add_token(TokenType.SLASH_ASSIGN)  # /=
+                    self.add_token(TokenType.SLASH_ASSIGN)
                 else:
                     self.add_token(TokenType.SLASH)
 
             case '%':
                 self.add_token(TokenType.PERCENT)
 
-            # Логические операторы и сравнение
             case '!':
-                if self.match('='):
-                    self.add_token(TokenType.NEQ)  # !=
-                else:
-                    self.add_token(TokenType.NOT)  # !
+                self.add_token(TokenType.NEQ if self.match('=') else TokenType.NOT)
 
             case '=':
-                if self.match('='):
-                    self.add_token(TokenType.EQ)  # ==
-                else:
-                    self.add_token(TokenType.ASSIGN)  # =
+                self.add_token(TokenType.EQ if self.match('=') else TokenType.ASSIGN)
 
             case '<':
-                if self.match('='):
-                    self.add_token(TokenType.LEQ)  # <=
-                else:
-                    self.add_token(TokenType.LT)  # <
+                self.add_token(TokenType.LEQ if self.match('=') else TokenType.LT)
 
             case '>':
-                if self.match('='):
-                    self.add_token(TokenType.GEQ)  # >=
-                else:
-                    self.add_token(TokenType.GT)  # >
+                self.add_token(TokenType.GEQ if self.match('=') else TokenType.GT)
 
             case '&':
                 if self.match('&'):
-                    self.add_token(TokenType.AND)  # &&
+                    self.add_token(TokenType.AND)
                 else:
-                    self.error(f"Ожидался '&', получен '{self.peek()}'")
+                    self.add_token(TokenType.BIT_AND)
 
             case '|':
                 if self.match('|'):
-                    self.add_token(TokenType.OR)  # ||
+                    self.add_token(TokenType.OR)
                 else:
-                    self.error(f"Ожидался '|', получен '{self.peek()}'")
+                    self.error(f"Ожидался '|', получено '{self.peek()}'")
 
-            # Строковые литералы
             case '"':
                 self.string()
 
-            # Числа
             case _ if c.isdigit():
                 self.number()
 
-            # Идентификаторы и ключевые слова
             case _ if c.isalpha() or c == '_':
                 self.identifier()
 
-            # Пробельные символы
             case c if c in ' \t\r':
                 pass
 
@@ -227,9 +202,8 @@ class Scanner:
                 self.line += 1
                 self.column = 1
 
-            # Неизвестные символы
             case _:
-                self.error(f"Недопустимый символ: '{c}' (ASCII: {ord(c)})")
+                self.error(f"Неизвестный символ: '{c}' (ASCII: {ord(c)})")
 
     def block_comment(self) -> None:
         while not self.is_at_end():
@@ -272,7 +246,7 @@ class Scanner:
                 case '\\':
                     self.advance()
                     if self.is_at_end():
-                        self.error(f"Незавершенная строка, начатая в {start_line}:{start_column}")
+                        self.error(f"Незакрытая строка, начатая в {start_line}:{start_column}")
                         self.error("Неизвестная escape-последовательность: \\")
                         content = ''.join(value)
                         self.add_token(TokenType.STRING_LITERAL, content, lexeme_override=content)
@@ -301,7 +275,7 @@ class Scanner:
                             value.append(n)
 
                 case c if c in '\r\n':
-                    self.error(f"Незавершенная строка, начатая в {start_line}:{start_column}")
+                    self.error(f"Незакрытая строка, начатая в {start_line}:{start_column}")
                     content = ''.join(value)
                     self.add_token(TokenType.STRING_LITERAL, content, lexeme_override=content)
                     return
@@ -310,49 +284,41 @@ class Scanner:
                     value.append(c)
                     self.advance()
 
-        self.error(f"Незавершенная строка, начатая в {start_line}:{start_column}")
+        self.error(f"Незакрытая строка, начатая в {start_line}:{start_column}")
         content = ''.join(value)
         self.add_token(TokenType.STRING_LITERAL, content, lexeme_override=content)
 
     def number(self) -> None:
         start_pos = self.start
 
-        # Обработка отрицательных чисел
-        if self.source[start_pos] == '-':
-            self.start = start_pos + 1
-
         while self.peek().isdigit():
             self.advance()
 
-        match (self.peek(), self.peek_next().isdigit()):
-            case ('.', True):
+        if self.peek() == '.' and self.peek_next().isdigit():
+            self.advance()
+            while self.peek().isdigit():
                 self.advance()
-                while self.peek().isdigit():
-                    self.advance()
 
-                num_str = self.source[start_pos:self.current]
-                try:
-                    value = float(num_str)
-                    if abs(value) > 1e308:
-                        self.error(f"Литерал с плавающей точкой вне диапазона: {num_str}")
-                    self.add_token(TokenType.FLOAT_LITERAL, value)
-                except ValueError:
-                    self.error(f"Недопустимый литерал с плавающей точкой: {num_str}")
-                    self.add_token(TokenType.FLOAT_LITERAL, 0.0)
+            num_str = self.source[start_pos:self.current]
+            try:
+                value = float(num_str)
+                self.add_token(TokenType.FLOAT_LITERAL, value)
+            except ValueError:
+                self.error(f"Некорректное число с плавающей точкой: {num_str}")
+                self.add_token(TokenType.FLOAT_LITERAL, 0.0)
 
-            case _:
-                num_str = self.source[start_pos:self.current]
-                try:
-                    value = int(num_str)
-                    INT_MIN = -2 ** 31
-                    INT_MAX = 2 ** 31 - 1
-                    if value < INT_MIN or value > INT_MAX:
-                        self.error(
-                            f"Целочисленный литерал вне 32-битного диапазона: {value} (допустимо {INT_MIN}..{INT_MAX})")
-                    self.add_token(TokenType.INT_LITERAL, value)
-                except ValueError:
-                    self.error(f"Недопустимый целочисленный литерал: {num_str}")
-                    self.add_token(TokenType.INT_LITERAL, 0)
+        else:
+            num_str = self.source[start_pos:self.current]
+            try:
+                value = int(num_str)
+                INT_MIN = -2 ** 31
+                INT_MAX = 2 ** 31 - 1
+                if value < INT_MIN or value > INT_MAX:
+                    self.error(f"Целочисленный литерал вне 32-битного диапазона: {value}")
+                self.add_token(TokenType.INT_LITERAL, value)
+            except ValueError:
+                self.error(f"Некорректное целое число: {num_str}")
+                self.add_token(TokenType.INT_LITERAL, 0)
 
     def identifier(self) -> None:
         while self.peek().isalnum() or self.peek() == '_':
@@ -361,20 +327,21 @@ class Scanner:
         lexeme = self.source[self.start:self.current]
 
         if len(lexeme) > 255:
-            self.error(f"Идентификатор слишком длинный: {lexeme[:20]}... (максимум 255 символов)")
+            self.error(f"Идентификатор слишком длинный: {lexeme[:20]}... (макс. 255 символов)")
 
         if lexeme[0].isdigit():
             self.error(f"Идентификатор не может начинаться с цифры: '{lexeme}'")
 
-        # Проверяем ключевые слова
-        token_type = self.KEYWORDS.get(lexeme, TokenType.IDENTIFIER)
-
-        if lexeme == 'true':
-            self.add_token(TokenType.BOOL_LITERAL, True)
-        elif lexeme == 'false':
-            self.add_token(TokenType.BOOL_LITERAL, False)
-        else:
-            self.add_token(token_type)
+        match lexeme:
+            case 'true':
+                self.add_token(TokenType.BOOL_LITERAL, True)
+            case 'false':
+                self.add_token(TokenType.BOOL_LITERAL, False)
+            case 'null':
+                self.add_token(TokenType.NULL_LITERAL, None)
+            case _:
+                token_type = self.KEYWORDS.get(lexeme, TokenType.IDENTIFIER)
+                self.add_token(token_type)
 
     def add_token(self, token_type: TokenType, literal_value: Optional[Any] = None,
                   lexeme_override: Optional[str] = None) -> None:
