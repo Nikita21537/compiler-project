@@ -1,9 +1,7 @@
 from enum import Enum, auto
-from typing import Any, Optional
 
 
 class TokenType(Enum):
-    # Ключевые слова
     KW_IF = auto()
     KW_ELSE = auto()
     KW_WHILE = auto()
@@ -15,86 +13,78 @@ class TokenType(Enum):
     KW_VOID = auto()
     KW_STRUCT = auto()
     KW_FN = auto()
-    KW_STRING = auto()  # Добавлено для типа string
+    KW_STRING = auto()
 
-    # Литералы
+    INCREMENT = auto()
+    DECREMENT = auto()
+
+    NULL_LITERAL = auto()
+
     IDENTIFIER = auto()
+    BOOL_LITERAL = auto()
     INT_LITERAL = auto()
     FLOAT_LITERAL = auto()
     STRING_LITERAL = auto()
-    BOOL_LITERAL = auto()
 
-    # Операторы арифметические
     PLUS = auto()
     MINUS = auto()
     STAR = auto()
     SLASH = auto()
     PERCENT = auto()
 
-    # Операторы присваивания
-    ASSIGN = auto()  # =
-    PLUS_ASSIGN = auto()  # +=
-    MINUS_ASSIGN = auto()  # -=
-    STAR_ASSIGN = auto()  # *=
-    SLASH_ASSIGN = auto()  # /=
+    EQ = auto()
+    NEQ = auto()
+    LT = auto()
+    LEQ = auto()
+    GT = auto()
+    GEQ = auto()
 
-    # Операторы сравнения
-    EQ = auto()  # ==
-    NEQ = auto()  # !=
-    LT = auto()  # <
-    LEQ = auto()  # <=
-    GT = auto()  # >
-    GEQ = auto()  # >=
+    AND = auto()
+    BIT_AND = auto()
+    OR = auto()
+    NOT = auto()
 
-    # Логические операторы
-    AND = auto()  # &&
-    OR = auto()  # ||
-    NOT = auto()  # !
+    ASSIGN = auto()
+    PLUS_ASSIGN = auto()
+    MINUS_ASSIGN = auto()
+    STAR_ASSIGN = auto()
+    SLASH_ASSIGN = auto()
 
-    # Инкремент/декремент
-    INCREMENT = auto()  # ++
-    DECREMENT = auto()  # --
+    LPAREN = auto()
+    RPAREN = auto()
+    LBRACE = auto()
+    RBRACE = auto()
+    LBRACKET = auto()
+    RBRACKET = auto()
+    COMMA = auto()
+    SEMICOLON = auto()
+    COLON = auto()
+    ARROW = auto()
+    DOT = auto()
 
-    # Стрелка для типа возврата
-    ARROW = auto()  # ->
-
-    # Разделители
-    LPAREN = auto()  # (
-    RPAREN = auto()  # )
-    LBRACE = auto()  # {
-    RBRACE = auto()  # }
-    LBRACKET = auto()  # [
-    RBRACKET = auto()  # ]
-    COMMA = auto()  # ,
-    SEMICOLON = auto()  # ;
-    COLON = auto()  # :
-    DOT = auto()  # . (для доступа к полям структур)
-
-    # Специальные
     EOF = auto()
-    ERROR = auto()
 
 
 class Token:
-
-    def __init__(
-            self,
-            token_type: TokenType,
-            lexeme: str,
-            line: int,
-            column: int,
-            literal_value: Optional[Any] = None
-    ):
-        self.token_type = token_type
+    def __init__(self, token_type, lexeme, line, column, literal_value=None):
+        self.type = token_type
         self.lexeme = lexeme
         self.line = line
         self.column = column
         self.literal_value = literal_value
 
-    def __str__(self) -> str:
-        if self.literal_value is not None:
-            return f"{self.line}:{self.column} {self.token_type.name} \"{self.lexeme}\" {self.literal_value}"
-        return f"{self.line}:{self.column} {self.token_type.name} \"{self.lexeme}\""
+    def __str__(self):
+        if self.type == TokenType.EOF:
+            return f"{self.line}:{self.column} EOF \"\""
 
-    def __repr__(self) -> str:
-        return self.__str__()
+        result = f"{self.line}:{self.column} {self.type.name} \"{self.lexeme}\""
+
+        if self.literal_value is not None:
+            if self.type == TokenType.INT_LITERAL:
+                result += f" {self.literal_value}"
+            elif self.type == TokenType.FLOAT_LITERAL:
+                result += f" {self.literal_value}"
+            elif self.type == TokenType.BOOL_LITERAL:
+                result += f" {'true' if self.literal_value else 'false'}"
+
+        return result
