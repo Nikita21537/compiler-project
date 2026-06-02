@@ -2,7 +2,6 @@ import json
 
 
 class ASTNode:
-
     def __init__(self, line, column):
         self.line = line
         self.column = column
@@ -31,9 +30,7 @@ class ASTNode:
                     for item in value
                 ]
             elif hasattr(value, "lexeme"):
-                result[f"{name}"] = value.lexeme
-            elif hasattr(value, "value") and hasattr(value, "token_type"):
-                result[f"{name}"] = value.lexeme
+                result[f"{name}_token"] = value.lexeme
             else:
                 result[name] = value
 
@@ -49,18 +46,20 @@ class StatementNode(ASTNode):
 
 
 class ExpressionNode(ASTNode):
-    pass
+    def __init__(self, line, column):
+        super().__init__(line, column)
+        self.inferred_type = None
+        self.symbol = None
+        self.constant_value = None
 
 
 class ProgramNode(ASTNode):
-
     def __init__(self, declarations, line, column):
         super().__init__(line, column)
         self.declarations = declarations
 
 
 class FunctionDeclNode(DeclarationNode):
-
     def __init__(self, return_type, name, parameters, body, line, column):
         super().__init__(line, column)
         self.return_type = return_type
@@ -70,7 +69,6 @@ class FunctionDeclNode(DeclarationNode):
 
 
 class StructDeclNode(DeclarationNode):
-
     def __init__(self, name, fields, line, column):
         super().__init__(line, column)
         self.name = name
@@ -78,7 +76,6 @@ class StructDeclNode(DeclarationNode):
 
 
 class ParamNode(ASTNode):
-
     def __init__(self, type_, name, line, column):
         super().__init__(line, column)
         self.type = type_
@@ -86,27 +83,23 @@ class ParamNode(ASTNode):
 
 
 class BlockStmtNode(StatementNode):
-
     def __init__(self, statements, line, column):
         super().__init__(line, column)
         self.statements = statements
 
 
 class ExprStmtNode(StatementNode):
-
     def __init__(self, expression, line, column):
         super().__init__(line, column)
         self.expression = expression
 
 
 class EmptyStmtNode(StatementNode):
-
     def __init__(self, line, column):
         super().__init__(line, column)
 
 
 class IfStmtNode(StatementNode):
-
     def __init__(self, condition, then_branch, else_branch, line, column):
         super().__init__(line, column)
         self.condition = condition
@@ -115,7 +108,6 @@ class IfStmtNode(StatementNode):
 
 
 class WhileStmtNode(StatementNode):
-
     def __init__(self, condition, body, line, column):
         super().__init__(line, column)
         self.condition = condition
@@ -123,7 +115,6 @@ class WhileStmtNode(StatementNode):
 
 
 class ForStmtNode(StatementNode):
-
     def __init__(self, init, condition, update, body, line, column):
         super().__init__(line, column)
         self.init = init
@@ -133,14 +124,12 @@ class ForStmtNode(StatementNode):
 
 
 class ReturnStmtNode(StatementNode):
-
     def __init__(self, value, line, column):
         super().__init__(line, column)
         self.value = value
 
 
 class VarDeclStmtNode(StatementNode):
-
     def __init__(self, type_, name, initializer, line, column):
         super().__init__(line, column)
         self.type = type_
@@ -149,21 +138,18 @@ class VarDeclStmtNode(StatementNode):
 
 
 class LiteralExprNode(ExpressionNode):
-
     def __init__(self, value, line, column):
         super().__init__(line, column)
         self.value = value
 
 
 class IdentifierExprNode(ExpressionNode):
-
     def __init__(self, name, line, column):
         super().__init__(line, column)
         self.name = name
 
 
 class BinaryExprNode(ExpressionNode):
-
     def __init__(self, left, operator, right, line, column):
         super().__init__(line, column)
         self.left = left
@@ -172,17 +158,13 @@ class BinaryExprNode(ExpressionNode):
 
 
 class UnaryExprNode(ExpressionNode):
-
     def __init__(self, operator, operand, line, column):
         super().__init__(line, column)
         self.operator = operator
         self.operand = operand
-        self.is_prefix = False
-        self.is_postfix = False
 
 
 class AssignmentExprNode(ExpressionNode):
-
     def __init__(self, target, operator, value, line, column):
         super().__init__(line, column)
         self.target = target
@@ -191,7 +173,6 @@ class AssignmentExprNode(ExpressionNode):
 
 
 class CallExprNode(ExpressionNode):
-
     def __init__(self, callee, arguments, line, column):
         super().__init__(line, column)
         self.callee = callee
@@ -199,11 +180,23 @@ class CallExprNode(ExpressionNode):
 
 
 class StructAccessExprNode(ExpressionNode):
-
     def __init__(self, primary, field, line, column):
         super().__init__(line, column)
         self.primary = primary
         self.field = field
+
+
+class ArrayAccessExprNode(ExpressionNode):
+    def __init__(self, array, index, line, column):
+        super().__init__(line, column)
+        self.array = array
+        self.index = index
+
+
+class ArrayInitializerExprNode(ExpressionNode):
+    def __init__(self, elements, line, column):
+        super().__init__(line, column)
+        self.elements = elements
 
 
 def expr_to_str(expr):
@@ -219,6 +212,13 @@ def expr_to_str(expr):
 
     if isinstance(expr, IdentifierExprNode):
         return expr.name.lexeme if hasattr(expr.name, 'lexeme') else str(expr.name)
+
+    if isinstance(expr, ArrayAccessExprNode):
+        return f"{expr_to_str(expr.array)}[{expr_to_str(expr.index)}]"
+
+    if isinstance(expr, ArrayInitializerExprNode):
+        elements = ", ".join(expr_to_str(element) for element in expr.elements)
+        return "{" + elements + "}"
 
     if isinstance(expr, BinaryExprNode):
         return f"({expr_to_str(expr.left)} {expr.operator.lexeme} {expr_to_str(expr.right)})"
@@ -268,7 +268,10 @@ def pretty_print(node, indent=0):
         return result
 
     if isinstance(node, ParamNode):
-        return f"{pad}{node.type.lexeme} {node.name.lexeme}"
+        suffix = ""
+        for size in getattr(node, "array_sizes", []):
+            suffix += f"[{expr_to_str(size)}]"
+        return f"{pad}{node.type.lexeme} {node.name.lexeme}{suffix}"
 
     if isinstance(node, StructDeclNode):
         result = f"{pad}StructDecl: {node.name.lexeme}\n"
@@ -286,10 +289,13 @@ def pretty_print(node, indent=0):
         return result.rstrip()
 
     if isinstance(node, VarDeclStmtNode):
+        suffix = ""
+        for size in getattr(node, "array_sizes", []):
+            suffix += f"[{expr_to_str(size)}]"
         init = ""
         if node.initializer:
             init = f" = {expr_to_str(node.initializer)}"
-        return f"{pad}VarDecl: {node.type.lexeme} {node.name.lexeme}{init}"
+        return f"{pad}VarDecl: {node.type.lexeme} {node.name.lexeme}{suffix}{init}"
 
     if isinstance(node, ReturnStmtNode):
         if node.value:
@@ -344,9 +350,8 @@ def ast_to_json(ast):
 def generate_dot(ast):
     lines = [
         "digraph AST {",
-        '  rankdir=TB;',
-        '  node [shape=box, style="rounded,filled", fontname="Arial", fontsize=12];',
-        '  edge [fontname="Arial", fontsize=10, color="gray40"];'
+        'rankdir=TB;',
+        'node [shape=box, style="rounded,filled", fontname="Arial"];'
     ]
 
     def node_style(node):
@@ -358,299 +363,75 @@ def generate_dot(ast):
             return "#FADBD8"
         return "#F2F3F4"
 
-    def escape(s):
-        return str(s).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+    visited = set()
 
-    def get_location(node):
-        if hasattr(node, 'line') and hasattr(node, 'column'):
-            if hasattr(node, 'end_line') and hasattr(node, 'end_column'):
-                return f"[{node.line}:{node.column} - {node.end_line}:{node.end_column}]"
-            else:
-                return f"[строка {node.line}, колонка {node.column}]"
-        return ""
+    def escape(s):
+        return str(s).replace("\\", "\\\\").replace('"', '\\"')
 
     def make_label(node):
         label = node.__class__.__name__
-        pos = get_location(node)
 
         if isinstance(node, FunctionDeclNode):
             ret = node.return_type.lexeme if node.return_type else "void"
             label += f"\\n{node.name.lexeme} -> {ret}"
-            if pos:
-                label += f"\\n{pos}"
         elif isinstance(node, StructDeclNode):
             label += f"\\n{node.name.lexeme}"
-            if pos:
-                label += f"\\n{pos}"
         elif isinstance(node, ParamNode):
             label += f"\\n{node.type.lexeme} {node.name.lexeme}"
-            if pos:
-                label += f"\\n{pos}"
         elif isinstance(node, VarDeclStmtNode):
             label += f"\\n{node.type.lexeme} {node.name.lexeme}"
-            if node.initializer:
-                label += f"\\n= ..."
-            if pos:
-                label += f"\\n{pos}"
         elif isinstance(node, IdentifierExprNode):
             label += f"\\n{node.name.lexeme}"
-            if pos:
-                label += f"\\n{pos}"
         elif isinstance(node, LiteralExprNode):
-            if isinstance(node.value, str):
-                label += f'\\n"{node.value}"'
-            elif isinstance(node.value, bool):
-                label += f"\\n{'true' if node.value else 'false'}"
-            else:
-                label += f"\\n{node.value}"
-            if pos:
-                label += f"\\n{pos}"
+            label += f"\\n{node.value}"
         elif isinstance(node, BinaryExprNode):
-            op = node.operator.lexeme
-            if op == "&&":
-                op = "∧"
-            elif op == "||":
-                op = "∨"
-            elif op == "!=":
-                op = "≠"
-            elif op == "<=":
-                op = "≤"
-            elif op == ">=":
-                op = "≥"
-            label += f"\\n{op}"
-            if pos:
-                label += f"\\n{pos}"
+            label += f"\\n{node.operator.lexeme}"
         elif isinstance(node, UnaryExprNode):
             op = node.operator.lexeme
             if hasattr(node, "is_postfix") and node.is_postfix:
-                label += f"\\n{op} (постфикс)"
+                label += f"\\npostfix {op}"
             else:
-                label += f"\\n{op} (префикс)"
-            if pos:
-                label += f"\\n{pos}"
+                label += f"\\nprefix {op}"
         elif isinstance(node, AssignmentExprNode):
             label += f"\\n{node.operator.lexeme}"
-            if pos:
-                label += f"\\n{pos}"
         elif isinstance(node, StructAccessExprNode):
             label += f"\\n.{node.field.lexeme}"
-            if pos:
-                label += f"\\n{pos}"
-        elif isinstance(node, IfStmtNode):
-            label += "\\nif"
-            if pos:
-                label += f"\\n{pos}"
-        elif isinstance(node, WhileStmtNode):
-            label += "\\nwhile"
-            if pos:
-                label += f"\\n{pos}"
-        elif isinstance(node, ForStmtNode):
-            label += "\\nfor"
-            if pos:
-                label += f"\\n{pos}"
-        elif isinstance(node, ReturnStmtNode):
-            label += "\\nreturn"
-            if pos:
-                label += f"\\n{pos}"
-        elif isinstance(node, BlockStmtNode):
-            label += "\\n{ ... }"
-            if pos:
-                label += f"\\n{pos}"
-        else:
-            if pos:
-                label += f"\\n{pos}"
+        elif isinstance(node, ArrayInitializerExprNode):
+            label += "\\ninitializer"
+        elif isinstance(node, ArrayAccessExprNode):
+            label += "\\n[]"
 
         return escape(label)
 
-    visited = set()
-
-    def visit(node, parent_id=None, edge_label=None):
+    def visit(node):
         if node is None:
             return
 
         node_id = f"n{id(node)}"
-        if node_id not in visited:
-            visited.add(node_id)
-            lines.append(
-                f'  {node_id} [label="{make_label(node)}", fillcolor="{node_style(node)}"];'
-            )
+        if node_id in visited:
+            return
+        visited.add(node_id)
 
-        if parent_id is not None and edge_label is not None:
-            lines.append(f'  {parent_id} -> {node_id} [label="{edge_label}"];')
+        lines.append(
+            f'{node_id} [label="{make_label(node)}", fillcolor="{node_style(node)}"];'
+        )
 
         for attr_name, attr in node.__dict__.items():
-            if attr_name in ("line", "column", "end_line", "end_column"):
+            if attr_name in ("line", "column"):
                 continue
 
             if isinstance(attr, ASTNode):
-                visit(attr, node_id, attr_name)
+                child_id = f"n{id(attr)}"
+                visit(attr)
+                lines.append(f'{node_id} -> {child_id} [label="{attr_name}"];')
 
             elif isinstance(attr, list):
                 for idx, item in enumerate(attr):
                     if isinstance(item, ASTNode):
-                        visit(item, node_id, f"{attr_name}[{idx}]")
+                        child_id = f"n{id(item)}"
+                        visit(item)
+                        lines.append(f'{node_id} -> {child_id} [label="{attr_name}[{idx}]"];')
 
     visit(ast)
     lines.append("}")
     return "\n".join(lines)
-
-
-def ast_to_code(ast):
-    if isinstance(ast, ProgramNode):
-        result = []
-        for decl in ast.declarations:
-            result.append(ast_to_code(decl))
-        return "\n".join(result)
-
-    if isinstance(ast, FunctionDeclNode):
-        params = ", ".join([f"{p.type.lexeme} {p.name.lexeme}" for p in ast.parameters])
-        ret = f" -> {ast.return_type.lexeme}" if ast.return_type else ""
-        body = ast_to_code(ast.body)
-        return f"fn {ast.name.lexeme}({params}){ret} {body}"
-
-    if isinstance(ast, StructDeclNode):
-        fields = "\n".join([f"    {ast_to_code(f)}" for f in ast.fields])
-        return f"struct {ast.name.lexeme} {{\n{fields}\n}}"
-
-    if isinstance(ast, BlockStmtNode):
-        stmts = "\n".join([f"    {ast_to_code(s)}" for s in ast.statements])
-        return f"{{\n{stmts}\n}}"
-
-    if isinstance(ast, VarDeclStmtNode):
-        init = f" = {ast_to_code(ast.initializer)}" if ast.initializer else ""
-        return f"{ast.type.lexeme} {ast.name.lexeme}{init};"
-
-    if isinstance(ast, ReturnStmtNode):
-        val = f" {ast_to_code(ast.value)}" if ast.value else ""
-        return f"return{val};"
-
-    if isinstance(ast, ExprStmtNode):
-        return f"{ast_to_code(ast.expression)};"
-
-    if isinstance(ast, IfStmtNode):
-        cond = ast_to_code(ast.condition)
-        then_branch = ast_to_code(ast.then_branch)
-        else_branch = f" else {ast_to_code(ast.else_branch)}" if ast.else_branch else ""
-        return f"if ({cond}) {then_branch}{else_branch}"
-
-    if isinstance(ast, WhileStmtNode):
-        cond = ast_to_code(ast.condition)
-        body = ast_to_code(ast.body)
-        return f"while ({cond}) {body}"
-
-    if isinstance(ast, ForStmtNode):
-        init = ast_to_code(ast.init) if ast.init else ""
-        cond = ast_to_code(ast.condition) if ast.condition else ""
-        update = ast_to_code(ast.update) if ast.update else ""
-        body = ast_to_code(ast.body)
-        return f"for ({init}; {cond}; {update}) {body}"
-
-    if isinstance(ast, BinaryExprNode):
-        return f"({ast_to_code(ast.left)} {ast.operator.lexeme} {ast_to_code(ast.right)})"
-
-    if isinstance(ast, UnaryExprNode):
-        if hasattr(ast, 'is_postfix') and ast.is_postfix:
-            return f"({ast_to_code(ast.operand)}{ast.operator.lexeme})"
-        return f"({ast.operator.lexeme}{ast_to_code(ast.operand)})"
-
-    if isinstance(ast, AssignmentExprNode):
-        return f"({ast_to_code(ast.target)} {ast.operator.lexeme} {ast_to_code(ast.value)})"
-
-    if isinstance(ast, CallExprNode):
-        args = ", ".join([ast_to_code(a) for a in ast.arguments])
-        return f"{ast_to_code(ast.callee)}({args})"
-
-    if isinstance(ast, LiteralExprNode):
-        if isinstance(ast.value, str):
-            return f'"{ast.value}"'
-        if isinstance(ast.value, bool):
-            return "true" if ast.value else "false"
-        return str(ast.value)
-
-    if isinstance(ast, IdentifierExprNode):
-        return ast.name.lexeme
-
-    if isinstance(ast, StructAccessExprNode):
-        return f"{ast_to_code(ast.primary)}.{ast.field.lexeme}"
-
-    return ""
-
-
-
-
-class TypedNode:
-
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._inferred_type = None
-        self._symbol_ref = None
-        self._constant_value = None
-
-    @property
-    def inferred_type(self):
-        return self._inferred_type
-
-    @inferred_type.setter
-    def inferred_type(self, value):
-        self._inferred_type = value
-
-    @property
-    def symbol(self):
-        return self._symbol_ref
-
-    @symbol.setter
-    def symbol(self, value):
-        self._symbol_ref = value
-
-    @property
-    def constant_value(self):
-        return self._constant_value
-
-    @constant_value.setter
-    def constant_value(self, value):
-        self._constant_value = value
-
-
-
-def _apply_typed_mixin(cls):
-    if not hasattr(cls, '_typed_mixin_applied'):
-
-        original_init = getattr(cls, '__init__', None)
-
-
-        cls.inferred_type = property(
-            lambda self: self._inferred_type if hasattr(self, '_inferred_type') else None,
-            lambda self, v: setattr(self, '_inferred_type', v)
-        )
-        cls.symbol = property(
-            lambda self: self._symbol_ref if hasattr(self, '_symbol_ref') else None,
-            lambda self, v: setattr(self, '_symbol_ref', v)
-        )
-        cls.constant_value = property(
-            lambda self: self._constant_value if hasattr(self, '_constant_value') else None,
-            lambda self, v: setattr(self, '_constant_value', v)
-        )
-
-
-        def new_init(self, *args, **kwargs):
-            if original_init and original_init is not object.__init__:
-                original_init(self, *args, **kwargs)
-            self._inferred_type = None
-            self._symbol_ref = None
-            self._constant_value = None
-
-        cls.__init__ = new_init
-        cls._typed_mixin_applied = True
-    return cls
-
-
-
-for node_class in [
-    ProgramNode, FunctionDeclNode, StructDeclNode, ParamNode,
-    BlockStmtNode, ExprStmtNode, EmptyStmtNode, IfStmtNode,
-    WhileStmtNode, ForStmtNode, ReturnStmtNode, VarDeclStmtNode,
-    LiteralExprNode, IdentifierExprNode, BinaryExprNode,
-    UnaryExprNode, AssignmentExprNode, CallExprNode, StructAccessExprNode
-]:
-    _apply_typed_mixin(node_class)

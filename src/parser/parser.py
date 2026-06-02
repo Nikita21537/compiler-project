@@ -1,4 +1,4 @@
-from src.lexer.token import TokenType
+from src.lexer.tokens import TokenType, Token
 from src.parser.ast import *
 
 
@@ -7,7 +7,6 @@ class ParseError(Exception):
 
 
 class Parser:
-
     def __init__(self, tokens):
         self.tokens = tokens
         self.current = 0
@@ -15,14 +14,14 @@ class Parser:
 
     def peek(self):
         if self.current >= len(self.tokens):
-            return self.tokens[-1]
+            return self.tokens[-1] if self.tokens else None
         return self.tokens[self.current]
 
     def previous(self):
         return self.tokens[self.current - 1]
 
     def isAtEnd(self):
-        return self.peek().token_type == TokenType.EOF
+        return self.current >= len(self.tokens) or (self.peek() and self.peek().type == TokenType.EOF)
 
     def advance(self):
         if not self.isAtEnd():
@@ -32,12 +31,12 @@ class Parser:
     def check(self, type_):
         if self.isAtEnd():
             return False
-        return self.peek().token_type == type_
+        return self.peek().type == type_
 
     def checkNext(self, type_):
         if self.current + 1 >= len(self.tokens):
             return False
-        return self.tokens[self.current + 1].token_type == type_
+        return self.tokens[self.current + 1].type == type_
 
     def match(self, *types):
         for t in types:
@@ -53,7 +52,10 @@ class Parser:
         return None
 
     def error(self, token, message):
-        error_msg = f"[Строка {token.line}, Колонка {token.column}] Ошибка: {message}"
+        if token is None:
+            error_msg = f"Ошибка: {message}"
+        else:
+            error_msg = f"[Строка {token.line}, Колонка {token.column}] Ошибка: {message}"
         self.errors.append(error_msg)
 
     def get_errors(self):
@@ -64,10 +66,10 @@ class Parser:
             self.advance()
 
         while not self.isAtEnd():
-            if self.previous().token_type == TokenType.SEMICOLON:
+            if self.previous().type == TokenType.SEMICOLON:
                 return
 
-            if self.peek().token_type in [
+            if self.peek().type in [
                 TokenType.KW_FN,
                 TokenType.KW_STRUCT,
                 TokenType.KW_IF,
@@ -85,7 +87,11 @@ class Parser:
         try:
             return self.parseProgram()
         except Exception as e:
-            self.error(self.peek(), f"Неожиданная ошибка: {str(e)}")
+            token = self.peek()
+            if token:
+                self.error(token, str(e))
+            else:
+                self.errors.append(f"Ошибка: {str(e)}")
             return ProgramNode([], 1, 1)
 
     def parseProgram(self):
@@ -93,14 +99,18 @@ class Parser:
 
         while not self.isAtEnd():
             try:
-                decl = self.parseTopLevelDecl()
+                decl = self.parseDeclaration()
                 if decl is not None:
                     declarations.append(decl)
                 else:
-                    self.error(self.peek(), "Ожидалось объявление верхнего уровня")
+                    token = self.peek()
+                    if token:
+                        self.error(token, "Ожидалось объявление верхнего уровня")
                     self.synchronize()
             except Exception as e:
-                self.error(self.peek(), str(e))
+                token = self.peek()
+                if token:
+                    self.error(token, str(e))
                 self.synchronize()
 
         first = self.tokens[0] if self.tokens else None
@@ -109,7 +119,7 @@ class Parser:
 
         return ProgramNode(declarations, line, column)
 
-    def parseTopLevelDecl(self):
+    def parseDeclaration(self):
         if self.match(TokenType.KW_FN):
             return self.parseFunctionDecl()
 
@@ -197,52 +207,6 @@ class Parser:
             type_token.column
         )
 
-    def parseVarDecl(self):
-        type_token = self.consumeType()
-        if type_token is None:
-            return None
-
-        name = self.consume(TokenType.IDENTIFIER, "Ожидалось имя переменной")
-        if name is None:
-            return None
-
-        initializer = None
-        if self.match(TokenType.ASSIGN):
-            initializer = self.parseExpression()
-
-        semi = self.consume(TokenType.SEMICOLON, "Ожидалась ';' после объявления переменной")
-        if semi is None:
-            semi = name
-
-        return VarDeclStmtNode(
-            type_token,
-            name,
-            initializer,
-            type_token.line,
-            type_token.column
-        )
-
-    def parseVarDeclNoSemicolon(self):
-        type_token = self.consumeType()
-        if type_token is None:
-            return None
-
-        name = self.consume(TokenType.IDENTIFIER, "Ожидалось имя переменной")
-        if name is None:
-            return None
-
-        initializer = None
-        if self.match(TokenType.ASSIGN):
-            initializer = self.parseExpression()
-
-        return VarDeclStmtNode(
-            type_token,
-            name,
-            initializer,
-            type_token.line,
-            type_token.column
-        )
-
     def parseParameter(self):
         type_token = self.consumeType()
         if type_token is None:
@@ -252,12 +216,17 @@ class Parser:
         if name is None:
             return None
 
-        return ParamNode(type_token, name, type_token.line, type_token.column)
+        array_sizes = []
+        while self.match(TokenType.LBRACKET):
+            size_expr = self.parseExpression()
+            self.consume(TokenType.RBRACKET, "Ожидалась ']' после размера массива")
+            array_sizes.append(size_expr)
+
+        node = ParamNode(type_token, name, type_token.line, type_token.column)
+        node.array_sizes = array_sizes
+        return node
 
     def parseStatement(self):
-        if self.match(TokenType.LBRACE):
-            return self.parseBlockBody()
-
         if self.match(TokenType.KW_IF):
             return self.parseIfStmt()
 
@@ -269,6 +238,9 @@ class Parser:
 
         if self.match(TokenType.KW_RETURN):
             return self.parseReturnStmt()
+
+        if self.match(TokenType.LBRACE):
+            return self.parseBlockBody()
 
         if self.isVarDeclStart():
             return self.parseVarDecl()
@@ -302,6 +274,77 @@ class Parser:
 
         return BlockStmtNode(statements, end.line, end.column)
 
+    def parseVarDecl(self):
+        type_token = self.consumeType()
+        if type_token is None:
+            return None
+
+        name = self.consume(TokenType.IDENTIFIER, "Ожидалось имя переменной")
+        if name is None:
+            return None
+
+        array_sizes = []
+        while self.match(TokenType.LBRACKET):
+            size_expr = self.parseExpression()
+            self.consume(TokenType.RBRACKET, "Ожидалась ']' после размера массива")
+            array_sizes.append(size_expr)
+
+        initializer = None
+        if self.match(TokenType.ASSIGN):
+            if self.check(TokenType.LBRACE):
+                initializer = self.parseArrayInitializer()
+            else:
+                initializer = self.parseExpression()
+
+        semi = self.consume(TokenType.SEMICOLON, "Ожидалась ';' после объявления переменной")
+        if semi is None:
+            semi = name
+
+        node = VarDeclStmtNode(
+            type_token,
+            name,
+            initializer,
+            type_token.line,
+            type_token.column
+        )
+        node.array_sizes = array_sizes
+        return node
+
+    def parseArrayInitializer(self):
+        brace = self.consume(TokenType.LBRACE, "Ожидалась '{' для инициализатора массива")
+        if brace is None:
+            brace = self.peek()
+
+        elements = []
+
+        if not self.check(TokenType.RBRACE):
+            element = self.parseExpression()
+            if element is not None:
+                elements.append(element)
+
+            while self.match(TokenType.COMMA):
+                if self.check(TokenType.RBRACE):
+                    break
+                element = self.parseExpression()
+                if element is not None:
+                    elements.append(element)
+
+        self.consume(TokenType.RBRACE, "Ожидалась '}' после инициализатора массива")
+
+        return ArrayInitializerExprNode(elements, brace.line, brace.column)
+
+    def parseExprStmt(self):
+        expr = self.parseExpression()
+        if expr is None:
+            self.error(self.peek(), "Ожидалось выражение")
+            return None
+
+        semi = self.consume(TokenType.SEMICOLON, "Ожидалась ';' после выражения")
+        if semi is None:
+            semi = expr
+
+        return ExprStmtNode(expr, semi.line, semi.column)
+
     def parseIfStmt(self):
         self.consume(TokenType.LPAREN, "Ожидалась '(' после 'if'")
         condition = self.parseExpression()
@@ -329,38 +372,62 @@ class Parser:
     def parseForStmt(self):
         self.consume(TokenType.LPAREN, "Ожидалась '(' после 'for'")
 
-        # Разбор инициализации
-        init = None
-        if self.check(TokenType.SEMICOLON):
-            self.advance()  # Пропускаем пустую инициализацию
+        if self.match(TokenType.SEMICOLON):
+            init = None
         elif self.isVarDeclStart():
             init = self.parseVarDeclNoSemicolon()
             self.consume(TokenType.SEMICOLON, "Ожидалась ';' после инициализации")
         else:
             expr = self.parseExpression()
-            semi = self.consume(TokenType.SEMICOLON, "Ожидалась ';' после выражения")
-            if expr is not None:
-                if semi is None:
-                    semi = self.peek()
-                init = ExprStmtNode(expr, semi.line, semi.column)
+            self.consume(TokenType.SEMICOLON, "Ожидалась ';' после выражения")
+            init = ExprStmtNode(expr, expr.line, expr.column)
 
-        # Разбор условия
         condition = None
         if not self.check(TokenType.SEMICOLON):
             condition = self.parseExpression()
         self.consume(TokenType.SEMICOLON, "Ожидалась ';' после условия")
 
-        # Разбор шага
         update = None
         if not self.check(TokenType.RPAREN):
             update = self.parseExpression()
         self.consume(TokenType.RPAREN, "Ожидалась ')' после заголовка цикла")
 
-        # Разбор тела
         body = self.parseStatement()
 
         token = self.previous()
         return ForStmtNode(init, condition, update, body, token.line, token.column)
+
+    def parseVarDeclNoSemicolon(self):
+        type_token = self.consumeType()
+        if type_token is None:
+            return None
+
+        name = self.consume(TokenType.IDENTIFIER, "Ожидалось имя переменной")
+        if name is None:
+            return None
+
+        array_sizes = []
+        while self.match(TokenType.LBRACKET):
+            size_expr = self.parseExpression()
+            self.consume(TokenType.RBRACKET, "Ожидалась ']' после размера массива")
+            array_sizes.append(size_expr)
+
+        initializer = None
+        if self.match(TokenType.ASSIGN):
+            if self.check(TokenType.LBRACE):
+                initializer = self.parseArrayInitializer()
+            else:
+                initializer = self.parseExpression()
+
+        node = VarDeclStmtNode(
+            type_token,
+            name,
+            initializer,
+            type_token.line,
+            type_token.column
+        )
+        node.array_sizes = array_sizes
+        return node
 
     def parseReturnStmt(self):
         value = None
@@ -373,23 +440,11 @@ class Parser:
 
         return ReturnStmtNode(value, semi.line, semi.column)
 
-    def parseExprStmt(self):
-        expr = self.parseExpression()
-        if expr is None:
-            self.error(self.peek(), "Ожидалось выражение")
-            return None
-
-        semi = self.consume(TokenType.SEMICOLON, "Ожидалась ';' после выражения")
-        if semi is None:
-            semi = expr
-
-        return ExprStmtNode(expr, semi.line, semi.column)
-
     def parseExpression(self):
         return self.parseAssignment()
 
     def parseAssignment(self):
-        expr = self.parseLogicalOr()
+        expr = self.parseOr()
 
         if self.match(
                 TokenType.ASSIGN,
@@ -400,32 +455,21 @@ class Parser:
         ):
             operator = self.previous()
             value = self.parseAssignment()
-
-            # Проверка, что левая часть - допустимая цель присваивания
-            if not isinstance(expr, IdentifierExprNode) and not isinstance(expr, StructAccessExprNode):
-                self.error(operator, "Недопустимая цель присваивания")
-
-            return AssignmentExprNode(
-                expr,
-                operator,
-                value,
-                operator.line,
-                operator.column
-            )
+            return AssignmentExprNode(expr, operator, value, operator.line, operator.column)
 
         return expr
 
-    def parseLogicalOr(self):
-        expr = self.parseLogicalAnd()
+    def parseOr(self):
+        expr = self.parseAnd()
 
         while self.match(TokenType.OR):
             operator = self.previous()
-            right = self.parseLogicalAnd()
+            right = self.parseAnd()
             expr = BinaryExprNode(expr, operator, right, operator.line, operator.column)
 
         return expr
 
-    def parseLogicalAnd(self):
+    def parseAnd(self):
         expr = self.parseEquality()
 
         while self.match(TokenType.AND):
@@ -436,64 +480,36 @@ class Parser:
         return expr
 
     def parseEquality(self):
-        expr = self.parseRelational()
+        expr = self.parseComparison()
 
         if self.match(TokenType.EQ, TokenType.NEQ):
             operator = self.previous()
-            right = self.parseRelational()
-
-            # Проверка на неассоциативность
-            if self.match(TokenType.EQ, TokenType.NEQ):
-                bad = self.previous()
-                self.error(
-                    bad,
-                    "Операторы сравнения неассоциативны; используйте скобки"
-                )
-                # Продолжаем разбор для восстановления
-                extra_right = self.parseRelational()
-                # Создаем левоассоциативную структуру для восстановления
-                temp = BinaryExprNode(expr, operator, right, operator.line, operator.column)
-                expr = BinaryExprNode(temp, bad, extra_right, bad.line, bad.column)
-            else:
-                expr = BinaryExprNode(expr, operator, right, operator.line, operator.column)
-
-        return expr
-
-    def parseRelational(self):
-        expr = self.parseAdditive()
-
-        if self.match(TokenType.LT, TokenType.LEQ, TokenType.GT, TokenType.GEQ):
-            operator = self.previous()
-            right = self.parseAdditive()
-
-            # Проверка на неассоциативность
-            if self.match(TokenType.LT, TokenType.LEQ, TokenType.GT, TokenType.GEQ):
-                bad = self.previous()
-                self.error(
-                    bad,
-                    "Операторы сравнения неассоциативны; используйте скобки"
-                )
-                # Продолжаем разбор для восстановления
-                extra_right = self.parseAdditive()
-                # Создаем левоассоциативную структуру для восстановления
-                temp = BinaryExprNode(expr, operator, right, operator.line, operator.column)
-                expr = BinaryExprNode(temp, bad, extra_right, bad.line, bad.column)
-            else:
-                expr = BinaryExprNode(expr, operator, right, operator.line, operator.column)
-
-        return expr
-
-    def parseAdditive(self):
-        expr = self.parseMultiplicative()
-
-        while self.match(TokenType.PLUS, TokenType.MINUS):
-            operator = self.previous()
-            right = self.parseMultiplicative()
+            right = self.parseComparison()
             expr = BinaryExprNode(expr, operator, right, operator.line, operator.column)
 
         return expr
 
-    def parseMultiplicative(self):
+    def parseComparison(self):
+        expr = self.parseTerm()
+
+        if self.match(TokenType.LT, TokenType.LEQ, TokenType.GT, TokenType.GEQ):
+            operator = self.previous()
+            right = self.parseTerm()
+            expr = BinaryExprNode(expr, operator, right, operator.line, operator.column)
+
+        return expr
+
+    def parseTerm(self):
+        expr = self.parseFactor()
+
+        while self.match(TokenType.PLUS, TokenType.MINUS):
+            operator = self.previous()
+            right = self.parseFactor()
+            expr = BinaryExprNode(expr, operator, right, operator.line, operator.column)
+
+        return expr
+
+    def parseFactor(self):
         expr = self.parseUnary()
 
         while self.match(TokenType.STAR, TokenType.SLASH, TokenType.PERCENT):
@@ -504,17 +520,22 @@ class Parser:
         return expr
 
     def parseUnary(self):
-        if self.match(
-                TokenType.NOT,
-                TokenType.MINUS,
-                TokenType.INCREMENT,
-                TokenType.DECREMENT
-        ):
+        if self.match(TokenType.NOT, TokenType.MINUS, TokenType.INCREMENT, TokenType.DECREMENT):
             operator = self.previous()
             operand = self.parseUnary()
             node = UnaryExprNode(operator, operand, operator.line, operator.column)
             node.is_prefix = True
             return node
+
+        if self.match(TokenType.STAR):
+            operator = self.previous()
+            operand = self.parseUnary()
+            return UnaryExprNode(operator, operand, operator.line, operator.column)
+
+        if self.match(TokenType.BIT_AND):
+            operator = self.previous()
+            operand = self.parseUnary()
+            return UnaryExprNode(operator, operand, operator.line, operator.column)
 
         return self.parsePostfix()
 
@@ -525,7 +546,6 @@ class Parser:
 
         while True:
             if self.match(TokenType.LPAREN):
-                # CallSuffix
                 arguments = []
 
                 if not self.check(TokenType.RPAREN):
@@ -544,8 +564,14 @@ class Parser:
 
                 expr = CallExprNode(expr, arguments, paren.line, paren.column)
 
+            elif self.match(TokenType.LBRACKET):
+                index = self.parseExpression()
+                bracket = self.consume(TokenType.RBRACKET, "Ожидалась ']' после индекса")
+                if bracket is None:
+                    bracket = self.peek()
+                expr = ArrayAccessExprNode(expr, index, bracket.line, bracket.column)
+
             elif self.match(TokenType.DOT):
-                # FieldAccess
                 name = self.consume(TokenType.IDENTIFIER, "Ожидалось имя поля после '.'")
                 if name is None:
                     return expr
@@ -558,14 +584,6 @@ class Parser:
             operator = self.previous()
             node = UnaryExprNode(operator, expr, operator.line, operator.column)
             node.is_postfix = True
-
-            if self.match(TokenType.INCREMENT, TokenType.DECREMENT):
-                bad = self.previous()
-                self.error(
-                    bad,
-                    "Разрешен только один постфиксный оператор"
-                )
-
             expr = node
 
         return expr
@@ -587,6 +605,10 @@ class Parser:
             token = self.previous()
             return LiteralExprNode(token.literal_value, token.line, token.column)
 
+        if self.match(TokenType.NULL_LITERAL):
+            token = self.previous()
+            return LiteralExprNode(None, token.line, token.column)
+
         if self.match(TokenType.IDENTIFIER):
             token = self.previous()
             return IdentifierExprNode(token, token.line, token.column)
@@ -604,12 +626,11 @@ class Parser:
                 TokenType.KW_INT,
                 TokenType.KW_FLOAT,
                 TokenType.KW_BOOL,
-                TokenType.KW_VOID,
-                TokenType.KW_STRING,  # Добавлено
+                TokenType.KW_STRING,
+                TokenType.KW_VOID
         ):
             return self.previous()
 
-        # Пользовательский тип: просто Identifier
         if self.match(TokenType.IDENTIFIER):
             return self.previous()
 
@@ -620,21 +641,11 @@ class Parser:
         if self.isAtEnd():
             return False
 
-        # Базовые типы
-        if self.check(
-                TokenType.KW_INT
-        ) or self.check(
-            TokenType.KW_FLOAT
-        ) or self.check(
-            TokenType.KW_BOOL
-        ) or self.check(
-            TokenType.KW_VOID
-        ) or self.check(
-            TokenType.KW_STRING  # Добавлено
-        ):
+        if self.check(TokenType.KW_INT) or self.check(TokenType.KW_FLOAT) or \
+           self.check(TokenType.KW_BOOL) or self.check(TokenType.KW_STRING) or \
+           self.check(TokenType.KW_VOID):
             return True
 
-        # Пользовательский тип: Identifier Identifier ...
         if self.check(TokenType.IDENTIFIER) and self.checkNext(TokenType.IDENTIFIER):
             return True
 
