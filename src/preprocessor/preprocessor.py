@@ -176,3 +176,5 @@ class Preprocessor:
 
         result = ''.join(new_line)
         return result if result.strip() or result == '' else None
+    def get_errors(self):
+        return self.errors
