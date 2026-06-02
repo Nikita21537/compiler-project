@@ -9,8 +9,8 @@ function main: int ()
   while_cond1:
     t1 = LOAD x    # load x
     t2 = CMP_LT t1, 3    # < expression
-    JUMP_IF_NOT t2, while_exit3    # while false
-    JUMP while_body2    # while true
+    JUMP_IF_NOT t2, while_exit3    # condition false
+    JUMP while_body2    # condition true
   while_body2:
     t3 = LOAD x    # load x
     t4 = ADD t3, 1    # + expression

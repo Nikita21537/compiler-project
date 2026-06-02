@@ -1,0 +1,77 @@
+// Test short-circuit evaluation for && and ||
+fn main() -> int {
+    int result = 0;
+
+    // Test 1: && short-circuit (left false -> right not evaluated)
+    int a = 0;
+    int b = 0;
+    if (a == 1 && (b = 1) == 1) {
+        result = 1;
+    }
+    // b should still be 0 because right side not evaluated
+    if (b == 0) {
+        result = result + 10;
+    }
+
+    // Test 2: && (left true -> right evaluated)
+    int c = 1;
+    int d = 0;
+    if (c == 1 && (d = 1) == 1) {
+        result = result + 100;
+    }
+    // d should be 1 now
+    if (d == 1) {
+        result = result + 5;
+    }
+
+    // Test 3: || short-circuit (left true -> right not evaluated)
+    int e = 1;
+    int f = 0;
+    if (e == 1 || (f = 1) == 1) {
+        result = result + 1000;
+    }
+    // f should still be 0
+    if (f == 0) {
+        result = result + 2;
+    }
+
+    // Test 4: || (left false -> right evaluated)
+    int g = 0;
+    int h = 0;
+    if (g == 1 || (h = 1) == 1) {
+        result = result + 10000;
+    }
+    // h should be 1
+    if (h == 1) {
+        result = result + 3;
+    }
+
+    // Test 5: complex nested short-circuit
+    int x = 0;
+    int y = 0;
+    int z = 0;
+
+    if ((x == 1 && y == 1) || (z = 1) == 1) {
+        result = result + 100000;
+    }
+    // z should be 1 (right side of || evaluated because left is false)
+    if (z == 1) {
+        result = result + 4;
+    }
+
+    // Test 6: multiple && operators
+    int p = 1;
+    int q = 0;
+    int r = 0;
+
+    if (p == 1 && q == 1 && (r = 1) == 1) {
+        result = result + 1;
+    }
+    // r should still be 0 (short-circuited at q == 1)
+    if (r == 0) {
+        result = result + 6;
+    }
+
+    return result;
+    // Expected: 10 + 100 + 5 + 1000 + 2 + 10000 + 3 + 100000 + 4 + 6 = 111130
+}

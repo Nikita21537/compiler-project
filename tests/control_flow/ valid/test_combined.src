@@ -1,0 +1,88 @@
+// Combined test: all control flow features together
+fn main() -> int {
+    int result = 0;
+
+    // Factorial using while loop
+    int n = 5;
+    int fact = 1;
+    while (n > 0) {
+        fact = fact * n;
+        n = n - 1;
+    }
+    // fact = 120
+    result = result + fact;
+
+    // Sum of even numbers using for loop with condition
+    int sum_even = 0;
+    for (int i = 0; i <= 10; i = i + 1) {
+        if (i % 2 == 0) {
+            sum_even = sum_even + i;
+        }
+    }
+    // sum_even = 0+2+4+6+8+10 = 30
+    result = result + sum_even;
+
+    // Fibonacci using while with short-circuit
+    int fib_prev = 0;
+    int fib_curr = 1;
+    int fib_count = 0;
+    int fib_sum = 0;
+
+    while (fib_count < 5 && fib_curr < 100) {
+        fib_sum = fib_sum + fib_curr;
+        int fib_next = fib_prev + fib_curr;
+        fib_prev = fib_curr;
+        fib_curr = fib_next;
+        fib_count = fib_count + 1;
+    }
+    // fib_sum = 1+1+2+3+5 = 12
+    result = result + fib_sum;
+
+    // Max of three numbers using nested if
+    int max = 0;
+    int x = 42;
+    int y = 17;
+    int z = 89;
+
+    if (x > y) {
+        if (x > z) {
+            max = x;
+        } else {
+            max = z;
+        }
+    } else {
+        if (y > z) {
+            max = y;
+        } else {
+            max = z;
+        }
+    }
+    // max = 89
+    result = result + max;
+
+    // Power using for loop
+    int base = 2;
+    int exponent = 5;
+    int power = 1;
+    for (int i = 0; i < exponent; i = i + 1) {
+        power = power * base;
+    }
+    // power = 32
+    result = result + power;
+
+    // Check if prime using while with short-circuit
+    int num = 17;
+    int is_prime = 1;
+    int divisor = 2;
+    while (divisor < num && is_prime == 1) {
+        if (num % divisor == 0) {
+            is_prime = 0;
+        }
+        divisor = divisor + 1;
+    }
+    // is_prime = 1
+    result = result + is_prime;
+
+    return result;
+    // Expected: 120 + 30 + 12 + 89 + 32 + 1 = 284
+}

@@ -1,0 +1,59 @@
+int arr[5];
+
+fn main() -> int {
+    arr[0] = 50;
+    arr[1] = 10;
+    arr[2] = 40;
+    arr[3] = 30;
+    arr[4] = 20;
+    
+    int stack[16];
+    int top = 0;
+    stack[top] = 0;
+    top = top + 1;
+    stack[top] = 4;
+    top = top + 1;
+    
+    while (top > 0) {
+        top = top - 1;
+        int high = stack[top];
+        top = top - 1;
+        int low = stack[top];
+        
+        if (low < high) {
+            int pivot = arr[high];
+            int i = low - 1;
+            int j = low;
+            
+            while (j < high) {
+                if (arr[j] <= pivot) {
+                    i = i + 1;
+                    int temp = arr[i];
+                    arr[i] = arr[j];
+                    arr[j] = temp;
+                }
+                j = j + 1;
+            }
+            
+            int temp = arr[i + 1];
+            arr[i + 1] = arr[high];
+            arr[high] = temp;
+            int pi = i + 1;
+            
+            if (pi - 1 > low) {
+                stack[top] = low;
+                top = top + 1;
+                stack[top] = pi - 1;
+                top = top + 1;
+            }
+            if (pi + 1 < high) {
+                stack[top] = pi + 1;
+                top = top + 1;
+                stack[top] = high;
+                top = top + 1;
+            }
+        }
+    }
+    
+    return arr[0] + arr[1] + arr[2] + arr[3] + arr[4];
+}

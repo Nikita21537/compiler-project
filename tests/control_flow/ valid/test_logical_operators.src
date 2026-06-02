@@ -1,0 +1,74 @@
+// Test logical operators truth tables
+fn main() -> int {
+    int result = 0;
+
+    // Test AND truth table: false && false = false
+    if (0 && 0) {
+        result = 1;
+    } else {
+        result = 10;
+    }
+
+    // Test AND: false && true = false
+    if (0 && 1) {
+        result = result + 1;
+    } else {
+        result = result + 20;
+    }
+
+    // Test AND: true && false = false
+    if (1 && 0) {
+        result = result + 1;
+    } else {
+        result = result + 30;
+    }
+
+    // Test AND: true && true = true
+    if (1 && 1) {
+        result = result + 100;
+    } else {
+        result = result + 1;
+    }
+
+    // Test OR truth table: false || false = false
+    if (0 || 0) {
+        result = result + 1;
+    } else {
+        result = result + 1000;
+    }
+
+    // Test OR: false || true = true
+    if (0 || 1) {
+        result = result + 10000;
+    } else {
+        result = result + 1;
+    }
+
+    // Test OR: true || false = true
+    if (1 || 0) {
+        result = result + 100000;
+    } else {
+        result = result + 1;
+    }
+
+    // Test OR: true || true = true
+    if (1 || 1) {
+        result = result + 1000000;
+    } else {
+        result = result + 1;
+    }
+
+    // Test NOT operator
+    int not_result = 0;
+    if (!0) {
+        not_result = not_result + 1;
+    }
+    if (!1) {
+        not_result = not_result + 2;
+    }
+
+    result = result + not_result;
+
+    return result;
+    // Expected: 10 + 20 + 30 + 100 + 1000 + 10000 + 100000 + 1000000 + 1 = 1111161
+}

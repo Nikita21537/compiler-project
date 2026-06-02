@@ -1,0 +1,78 @@
+// Test complex expressions with operator precedence
+fn main() -> int {
+    int result = 0;
+
+    // Test 1: arithmetic precedence (* before +)
+    int a = 2 + 3 * 4;
+    // Expected: 2 + 12 = 14
+    result = result + a;
+
+    // Test 2: parentheses override precedence
+    int b = (2 + 3) * 4;
+    // Expected: 5 * 4 = 20
+    result = result + b;
+
+    // Test 3: relational vs arithmetic
+    int c = 0;
+    if (5 + 3 > 7) {
+        c = 100;
+    } else {
+        c = 1;
+    }
+    result = result + c;
+
+    // Test 4: equality vs relational
+    int d = 0;
+    if (5 < 6 == 1) {
+        d = 1000;
+    } else {
+        d = 1;
+    }
+    result = result + d;
+
+    // Test 5: logical vs relational
+    int e = 0;
+    if (5 > 3 && 2 < 4) {
+        e = 10000;
+    } else {
+        e = 1;
+    }
+    result = result + e;
+
+    // Test 6: complex nested expression
+    int f = (10 + 20) * (30 - 10) / (5 + 5);
+    // Expected: 30 * 20 / 10 = 600 / 10 = 60
+    result = result + f;
+
+    // Test 7: mixed types in condition
+    int g = 0;
+    if ((5 + 3) * 2 == 16 && 10 / 2 == 5) {
+        g = 100000;
+    } else {
+        g = 1;
+    }
+    result = result + g;
+
+    // Test 8: unary operators
+    int h = 5;
+    int i = -h;
+    result = result + i;  // -5
+
+    int j = 0;
+    if (!0) {
+        j = 1000000;
+    }
+    result = result + j;
+
+    // Test 9: increment/decrement
+    int k = 10;
+    k = k + 1;
+    result = result + k;  // 11
+
+    int l = 20;
+    l = l - 1;
+    result = result + l;  // 19
+
+    return result;
+    // Expected: 14 + 20 + 100 + 1000 + 10000 + 60 + 100000 - 5 + 1000000 + 11 + 19 = 1111219
+}

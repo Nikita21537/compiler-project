@@ -1,0 +1,55 @@
+// Test if-else statements
+fn main() -> int {
+    int result = 0;
+    int x = 10;
+    int y = 20;
+
+    // Test 1: if-then (condition true)
+    if (x < y) {
+        result = 100;
+    }
+
+    // Test 2: if-then (condition false)
+    if (x > y) {
+        result = 200;
+    }
+
+    // Test 3: if-else (condition true)
+    if (x < y) {
+        result = result + 10;
+    } else {
+        result = result + 1;
+    }
+
+    // Test 4: if-else (condition false)
+    if (x > y) {
+        result = result + 1;
+    } else {
+        result = result + 20;
+    }
+
+    // Test 5: nested if
+    int a = 5;
+    int b = 10;
+    int c = 15;
+
+    if (a < b) {
+        if (b < c) {
+            result = result + 50;
+        }
+    }
+
+    // Test 6: if with == operator
+    int z = 42;
+    if (z == 42) {
+        result = result + 7;
+    }
+
+    // Test 7: if with != operator
+    if (z != 100) {
+        result = result + 3;
+    }
+
+    return result;
+    // Expected: 100 + 10 + 20 + 50 + 7 + 3 = 190
+}

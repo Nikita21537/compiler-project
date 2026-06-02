@@ -1,0 +1,4 @@
+fn main() -> int {
+    Point p;
+    return 0;
+}

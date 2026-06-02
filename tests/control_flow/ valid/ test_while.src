@@ -1,0 +1,54 @@
+// Test while loops
+fn main() -> int {
+    // Test 1: simple while loop
+    int i = 0;
+    int sum = 0;
+    while (i < 5) {
+        sum = sum + i;
+        i = i + 1;
+    }
+    // sum = 0+1+2+3+4 = 10
+
+    // Test 2: while with condition using variable
+    int j = 10;
+    int count = 0;
+    while (j > 0) {
+        count = count + 1;
+        j = j - 1;
+    }
+    // count = 10
+
+    // Test 3: while with logical AND
+    int k = 0;
+    int m = 0;
+    while (k < 3 && m < 2) {
+        m = m + 1;
+        k = k + 1;
+    }
+    // m = 2, k = 2
+
+    // Test 4: while with logical OR
+    int p = 0;
+    int q = 0;
+    while (p < 3 || q < 2) {
+        p = p + 1;
+        q = q + 1;
+    }
+    // p = 3, q = 3
+
+    // Test 5: nested while loops
+    int outer = 0;
+    int inner_sum = 0;
+    while (outer < 3) {
+        int inner = 0;
+        while (inner < 3) {
+            inner_sum = inner_sum + 1;
+            inner = inner + 1;
+        }
+        outer = outer + 1;
+    }
+    // inner_sum = 9 (3x3)
+
+    return sum + count + m + p + inner_sum;
+    // Expected: 10 + 10 + 2 + 3 + 9 = 34
+}
