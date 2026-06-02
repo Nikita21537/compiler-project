@@ -14,6 +14,8 @@ class TypeKind(Enum):
     STRUCT = auto()
     FUNCTION = auto()
     ERROR = auto()
+    ARRAY = auto()
+    POINTER = auto()
 
 
 @dataclass
@@ -23,6 +25,8 @@ class Type:
     return_type: Optional["Type"] = None
     param_types: List["Type"] = field(default_factory=list)
     fields: Dict[str, "Type"] = field(default_factory=dict)
+    element_type: Optional["Type"] = None
+    array_size: Optional[int] = None
 
     def is_numeric(self) -> bool:
         return self.kind in {TypeKind.INT, TypeKind.FLOAT}
@@ -39,8 +43,11 @@ class Type:
     def is_function(self) -> bool:
         return self.kind == TypeKind.FUNCTION
 
-    def is_error(self) -> bool:  # <-- ЭТОТ МЕТОД НУЖНО ДОБАВИТЬ
-        return self.kind == TypeKind.ERROR
+    def is_array(self) -> bool:
+        return self.kind == TypeKind.ARRAY
+
+    def is_pointer(self) -> bool:
+        return self.kind == TypeKind.POINTER
 
     def equals(self, other: "Type") -> bool:
         if not isinstance(other, Type):
@@ -64,6 +71,16 @@ class Type:
 
             return all(a.equals(b) for a, b in zip(self.param_types, other.param_types))
 
+        if self.kind == TypeKind.POINTER:
+            if self.element_type is None or other.element_type is None:
+                return False
+            return self.element_type.equals(other.element_type)
+
+        if self.kind == TypeKind.ARRAY:
+            if self.element_type is None or other.element_type is None:
+                return False
+            return self.element_type.equals(other.element_type) and self.array_size == other.array_size
+
         return True
 
     def is_assignable_from(self, other: "Type") -> bool:
@@ -77,6 +94,9 @@ class Type:
             return True
 
         if self.kind == TypeKind.FLOAT and other.kind == TypeKind.INT:
+            return True
+
+        if self.is_pointer() and other.is_array():
             return True
 
         return False
@@ -103,16 +123,13 @@ class Type:
             ret = str(self.return_type) if self.return_type else "void"
             return f"fn({params}) -> {ret}"
 
+        if self.kind == TypeKind.ARRAY:
+            return f"{self.element_type}[{self.array_size}]"
+
+        if self.kind == TypeKind.POINTER:
+            return f"{self.element_type}*"
+
         return "<unknown>"
-
-    def __hash__(self):
-        if self.kind == TypeKind.STRUCT:
-            return hash((self.kind, self.name))
-        if self.kind == TypeKind.FUNCTION:
-            if self.return_type:
-                return hash((self.kind, tuple(self.param_types), self.return_type))
-        return hash(self.kind)
-
 
 
 INT_TYPE = Type(TypeKind.INT)
@@ -132,12 +149,10 @@ BUILTIN_TYPES = {
 
 
 def get_builtin_type(type_name: str) -> Optional[Type]:
-
     return BUILTIN_TYPES.get(type_name)
 
 
 def make_struct_type(name: str, fields: Optional[Dict[str, Type]] = None) -> Type:
-
     return Type(
         kind=TypeKind.STRUCT,
         name=name,
@@ -145,8 +160,22 @@ def make_struct_type(name: str, fields: Optional[Dict[str, Type]] = None) -> Typ
     )
 
 
-def make_function_type(param_types: List[Type], return_type: Type) -> Type:
+def make_array_type(element_type: Type, array_size: int) -> Type:
+    return Type(
+        kind=TypeKind.ARRAY,
+        element_type=element_type,
+        array_size=array_size,
+    )
 
+
+def make_pointer_type(element_type: Type) -> Type:
+    return Type(
+        kind=TypeKind.POINTER,
+        element_type=element_type,
+    )
+
+
+def make_function_type(param_types: List[Type], return_type: Type) -> Type:
     return Type(
         kind=TypeKind.FUNCTION,
         param_types=list(param_types),
@@ -155,12 +184,10 @@ def make_function_type(param_types: List[Type], return_type: Type) -> Type:
 
 
 def are_types_compatible(expected: Type, actual: Type) -> bool:
-
     return expected.is_assignable_from(actual)
 
 
 def infer_numeric_result_type(left: Type, right: Type) -> Type:
-
     if not left.is_numeric() or not right.is_numeric():
         return ERROR_TYPE
 
@@ -171,7 +198,6 @@ def infer_numeric_result_type(left: Type, right: Type) -> Type:
 
 
 def get_type_size(t: Type) -> int:
-
     if t == INT_TYPE:
         return 4
     if t == FLOAT_TYPE:
@@ -180,20 +206,17 @@ def get_type_size(t: Type) -> int:
         return 1
     if t == STRING_TYPE:
         return 8
-    if t.is_void():
-        return 0
-    if t.is_error():
-        return 0
 
+    if t.is_array():
+        return get_type_size(t.element_type) * int(t.array_size)
 
     if t.is_struct():
         total_size = 0
         max_alignment = 1
 
-        for field_type in t.fields.values():
+        for field_name, field_type in t.fields.items():
             field_size = get_type_size(field_type)
             field_alignment = get_type_alignment(field_type)
-
 
             if total_size % field_alignment != 0:
                 total_size += field_alignment - (total_size % field_alignment)
@@ -201,11 +224,13 @@ def get_type_size(t: Type) -> int:
             total_size += field_size
             max_alignment = max(max_alignment, field_alignment)
 
-
         if total_size % max_alignment != 0:
             total_size += max_alignment - (total_size % max_alignment)
 
         return total_size
+
+    if t.is_pointer():
+        return 8
 
     return 0
 
@@ -219,10 +244,9 @@ def get_type_alignment(t: Type) -> int:
         return 8
     if t == STRING_TYPE:
         return 8
-    if t.is_void():
-        return 0
-    if t.is_error():
-        return 1
+
+    if t.is_array():
+        return get_type_alignment(t.element_type)
 
     if t.is_struct():
         max_alignment = 1
@@ -231,4 +255,9 @@ def get_type_alignment(t: Type) -> int:
             max_alignment = max(max_alignment, field_alignment)
         return max_alignment
 
+    if t.is_pointer():
+        return 8
+
     return 1
+# CHAR_TYPE
+CHAR_TYPE = Type(TypeKind.INT)  # char как int для простоты

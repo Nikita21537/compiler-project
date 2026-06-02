@@ -1,13 +1,7 @@
 from __future__ import annotations
 
-from typing import Optional, List, Set, Tuple
-from src.parser.ast import (
-    ASTNode, ProgramNode, FunctionDeclNode, StructDeclNode, ParamNode,
-    BlockStmtNode, VarDeclStmtNode, ReturnStmtNode, ExprStmtNode,
-    EmptyStmtNode, IfStmtNode, WhileStmtNode, ForStmtNode,
-    LiteralExprNode, IdentifierExprNode, BinaryExprNode, UnaryExprNode,
-    AssignmentExprNode, CallExprNode, StructAccessExprNode,
-)
+from typing import Optional
+from src.parser.ast import *
 from src.parser.visitor import ASTVisitor
 from src.semantic.symbol_table import SymbolTable, SymbolInfo, SymbolKind, ScopeKind
 from src.semantic.type_system import (
@@ -21,8 +15,8 @@ from src.semantic.type_system import (
     get_builtin_type,
     make_struct_type,
     make_function_type,
-    get_type_size,
-    get_type_alignment,
+    make_array_type,
+    make_pointer_type,
 )
 from src.semantic.errors import SemanticErrorReporter, SemanticErrorKind
 
@@ -32,17 +26,19 @@ class SemanticAnalyzer(ASTVisitor):
         self.file_name = file_name
         self.symbol_table = SymbolTable()
         self.error_reporter = SemanticErrorReporter(file_name)
+
         self.current_function = None
         self.current_function_return_type: Optional[Type] = None
         self.current_stack_offset = 0
+
         self.loop_depth = 0
         self.current_statement_index = -1
+
         self.decorated_ast = None
 
     def analyze(self, ast: ProgramNode, source: str = "") -> ProgramNode:
         self.decorated_ast = ast
 
-        # Set source code for error reporting
         if source:
             self.error_reporter.set_source(source)
 
@@ -66,9 +62,12 @@ class SemanticAnalyzer(ASTVisitor):
 
     def _declare_builtin_functions(self) -> None:
         builtin_functions = [
-            ("print", VOID_TYPE, [STRING_TYPE]),
-            ("println", VOID_TYPE, [STRING_TYPE]),
             ("print_int", VOID_TYPE, [INT_TYPE]),
+            ("printf", INT_TYPE, [STRING_TYPE]),
+            ("malloc", make_pointer_type(INT_TYPE), [INT_TYPE]),
+            ("free", VOID_TYPE, [make_pointer_type(INT_TYPE)]),
+            ("strlen", INT_TYPE, [STRING_TYPE]),
+            ("pow", FLOAT_TYPE, [FLOAT_TYPE, FLOAT_TYPE]),
         ]
 
         for func_name, return_type, param_types in builtin_functions:
@@ -76,6 +75,7 @@ class SemanticAnalyzer(ASTVisitor):
                 continue
 
             param_symbols = []
+
             for i, param_type in enumerate(param_types):
                 param_symbols.append(
                     SymbolInfo(
@@ -155,8 +155,6 @@ class SemanticAnalyzer(ASTVisitor):
                 column=field.name.column,
                 initialized=True,
                 declaration_order=field_index,
-                size=get_type_size(field_type),
-                alignment=get_type_alignment(field_type),
             )
 
             field_map[field_name] = field_type
@@ -180,6 +178,46 @@ class SemanticAnalyzer(ASTVisitor):
         for field_symbol in field_symbols.values():
             self.symbol_table.insert(field_symbol.name, field_symbol)
         self.symbol_table.exit_scope()
+
+    def _apply_array_dimensions(self, base_type: Type, array_sizes, context: str) -> Type:
+        result_type = base_type
+
+        for size_expr in reversed(array_sizes):
+            if not isinstance(size_expr, LiteralExprNode) or not isinstance(size_expr.value, int):
+                self.error_reporter.add(
+                    SemanticErrorKind.TYPE_MISMATCH,
+                    "array size must be an integer literal",
+                    size_expr.line,
+                    size_expr.column,
+                    context=context,
+                    expected="integer literal",
+                    actual=type(size_expr).__name__,
+                )
+                return ERROR_TYPE
+
+            if size_expr.value <= 0:
+                self.error_reporter.add(
+                    SemanticErrorKind.TYPE_MISMATCH,
+                    "array size must be positive",
+                    size_expr.line,
+                    size_expr.column,
+                    context=context,
+                    expected="positive integer",
+                    actual=str(size_expr.value),
+                )
+                return ERROR_TYPE
+
+            result_type = make_array_type(result_type, size_expr.value)
+
+        return result_type
+
+    def _apply_pointer_depth(self, base_type: Type, pointer_depth: int) -> Type:
+        result_type = base_type
+
+        for _ in range(pointer_depth):
+            result_type = make_pointer_type(result_type)
+
+        return result_type
 
     def _declare_function(self, node: FunctionDeclNode) -> None:
         func_name = node.name.lexeme
@@ -210,6 +248,21 @@ class SemanticAnalyzer(ASTVisitor):
             seen_params.add(param_name)
 
             param_type = self.resolve_type_token(param.type)
+
+            pointer_depth = getattr(param, "pointer_depth", 0)
+
+            if pointer_depth:
+                param_type = self._apply_pointer_depth(param_type, pointer_depth)
+
+            array_sizes = getattr(param, "array_sizes", [])
+
+            if array_sizes:
+                param_type = self._apply_array_dimensions(
+                    param_type,
+                    array_sizes,
+                    context=f"in function '{func_name}'",
+                )
+
             param_types.append(param_type)
 
             param_symbols.append(
@@ -220,8 +273,6 @@ class SemanticAnalyzer(ASTVisitor):
                     line=param.name.line,
                     column=param.name.column,
                     initialized=True,
-                    size=get_type_size(param_type),
-                    alignment=get_type_alignment(param_type),
                 )
             )
 
@@ -241,6 +292,8 @@ class SemanticAnalyzer(ASTVisitor):
         self.symbol_table.insert(func_name, symbol)
 
     def _declare_global_variable(self, node: VarDeclStmtNode) -> None:
+        from src.semantic.type_system import get_type_size, get_type_alignment
+
         var_name = node.name.lexeme
 
         if self.symbol_table.lookup_local(var_name) is not None:
@@ -248,6 +301,20 @@ class SemanticAnalyzer(ASTVisitor):
             return
 
         var_type = self.resolve_type_token(node.type)
+
+        pointer_depth = getattr(node, "pointer_depth", 0)
+
+        if pointer_depth:
+            var_type = self._apply_pointer_depth(var_type, pointer_depth)
+
+        array_sizes = getattr(node, "array_sizes", [])
+
+        if array_sizes:
+            var_type = self._apply_array_dimensions(
+                var_type,
+                array_sizes,
+                context="in global scope",
+            )
 
         if var_type == VOID_TYPE:
             self.error_reporter.add(
@@ -259,10 +326,49 @@ class SemanticAnalyzer(ASTVisitor):
             )
             var_type = ERROR_TYPE
 
-        initialized = node.initializer is not None
+        initialized = node.initializer is not None or var_type.is_array()
 
         if node.initializer is not None:
             init_type = self.visit(node.initializer)
+
+            if isinstance(node.initializer, ArrayInitializerExprNode):
+                if not var_type.is_array():
+                    self.error_reporter.add(
+                        SemanticErrorKind.TYPE_MISMATCH,
+                        "array initializer can only initialize array variable",
+                        node.initializer.line,
+                        node.initializer.column,
+                        context=self._current_context(),
+                        expected="array",
+                        actual=str(var_type),
+                    )
+                    return
+
+                if len(node.initializer.elements) > int(var_type.array_size):
+                    self.error_reporter.add(
+                        SemanticErrorKind.TYPE_MISMATCH,
+                        "too many elements in array initializer",
+                        node.initializer.line,
+                        node.initializer.column,
+                        context=self._current_context(),
+                        expected=str(var_type.array_size),
+                        actual=str(len(node.initializer.elements)),
+                    )
+                    return
+
+                for element in node.initializer.elements:
+                    element_type = self.visit(element)
+                    if element_type is not None and not var_type.element_type.is_assignable_from(element_type):
+                        self.error_reporter.add(
+                            SemanticErrorKind.TYPE_MISMATCH,
+                            "array initializer element type mismatch",
+                            element.line,
+                            element.column,
+                            context=self._current_context(),
+                            expected=str(var_type.element_type),
+                            actual=str(element_type),
+                        )
+                init_type = var_type
 
             if init_type is not None and not var_type.is_assignable_from(init_type):
                 self.error_reporter.add(
@@ -282,9 +388,10 @@ class SemanticAnalyzer(ASTVisitor):
             line=node.name.line,
             column=node.name.column,
             initialized=initialized,
-            size=get_type_size(var_type),
-            alignment=get_type_alignment(var_type),
         )
+
+        symbol.size = get_type_size(var_type)
+        symbol.alignment = get_type_alignment(var_type)
 
         self.symbol_table.insert(var_name, symbol)
 
@@ -317,10 +424,12 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_BlockStmtNode(self, node: BlockStmtNode):
         self.symbol_table.enter_scope("block", ScopeKind.BLOCK)
         self._predeclare_block_variables(node.statements)
-        self._walk_block_statements(node.statements)  # ИСПРАВЛЕНО: добавлен вызов
+        self._walk_block_statements(node.statements)
         self.symbol_table.exit_scope()
 
     def visit_VarDeclStmtNode(self, node: VarDeclStmtNode):
+        from src.semantic.type_system import get_type_size, get_type_alignment
+
         var_name = node.name.lexeme
         existing_symbol = self.symbol_table.lookup_local(var_name)
 
@@ -333,6 +442,19 @@ class SemanticAnalyzer(ASTVisitor):
             return
 
         var_type = self.resolve_type_token(node.type)
+        pointer_depth = getattr(node, "pointer_depth", 0)
+
+        if pointer_depth:
+            var_type = self._apply_pointer_depth(var_type, pointer_depth)
+
+        array_sizes = getattr(node, "array_sizes", [])
+
+        if array_sizes:
+            var_type = self._apply_array_dimensions(
+                var_type,
+                array_sizes,
+                context=self._current_context(),
+            )
 
         if var_type == VOID_TYPE:
             self.error_reporter.add(
@@ -344,10 +466,49 @@ class SemanticAnalyzer(ASTVisitor):
             )
             var_type = ERROR_TYPE
 
-        initialized = node.initializer is not None
+        initialized = node.initializer is not None or var_type.is_array()
 
         if node.initializer is not None:
             init_type = self.visit(node.initializer)
+
+            if isinstance(node.initializer, ArrayInitializerExprNode):
+                if not var_type.is_array():
+                    self.error_reporter.add(
+                        SemanticErrorKind.TYPE_MISMATCH,
+                        "array initializer can only initialize array variable",
+                        node.initializer.line,
+                        node.initializer.column,
+                        context=self._current_context(),
+                        expected="array",
+                        actual=str(var_type),
+                    )
+                    return
+
+                if len(node.initializer.elements) > int(var_type.array_size):
+                    self.error_reporter.add(
+                        SemanticErrorKind.TYPE_MISMATCH,
+                        "too many elements in array initializer",
+                        node.initializer.line,
+                        node.initializer.column,
+                        context=self._current_context(),
+                        expected=str(var_type.array_size),
+                        actual=str(len(node.initializer.elements)),
+                    )
+                    return
+
+                for element in node.initializer.elements:
+                    element_type = self.visit(element)
+                    if element_type is not None and not var_type.element_type.is_assignable_from(element_type):
+                        self.error_reporter.add(
+                            SemanticErrorKind.TYPE_MISMATCH,
+                            "array initializer element type mismatch",
+                            element.line,
+                            element.column,
+                            context=self._current_context(),
+                            expected=str(var_type.element_type),
+                            actual=str(element_type),
+                        )
+                init_type = var_type
 
             if init_type is not None and init_type != ERROR_TYPE and not var_type.is_assignable_from(init_type):
                 self.error_reporter.add(
@@ -383,9 +544,6 @@ class SemanticAnalyzer(ASTVisitor):
 
     def visit_ExprStmtNode(self, node: ExprStmtNode):
         self.visit(node.expression)
-
-    def visit_EmptyStmtNode(self, node: EmptyStmtNode):
-        pass
 
     def visit_IfStmtNode(self, node: IfStmtNode):
         condition_type = self.visit(node.condition)
@@ -514,11 +672,12 @@ class SemanticAnalyzer(ASTVisitor):
         node.symbol = symbol
         node.inferred_type = symbol.type
 
-        if (symbol.kind == SymbolKind.VARIABLE and
-            symbol.scope_name == self.symbol_table.current_scope.name and
-            symbol.scope_depth == self.symbol_table.current_scope.depth and
-            symbol.declaration_order > self.current_statement_index >= 0):
-
+        if (
+                symbol.kind == SymbolKind.VARIABLE
+                and symbol.scope_name == self.symbol_table.current_scope.name
+                and symbol.scope_depth == self.symbol_table.current_scope.depth
+                and symbol.declaration_order > self.current_statement_index >= 0
+        ):
             self.error_reporter.add(
                 SemanticErrorKind.USE_BEFORE_DECLARATION,
                 f"identifier '{name}' is used before its declaration",
@@ -529,7 +688,11 @@ class SemanticAnalyzer(ASTVisitor):
             )
             return ERROR_TYPE
 
-        if symbol.kind in {SymbolKind.VARIABLE, SymbolKind.PARAMETER} and not symbol.initialized:
+        if (
+                symbol.kind in {SymbolKind.VARIABLE, SymbolKind.PARAMETER}
+                and not symbol.initialized
+                and not symbol.type.is_array()
+        ):
             self.error_reporter.add(
                 SemanticErrorKind.UNINITIALIZED_VARIABLE,
                 f"variable '{name}' may be used before initialization",
@@ -618,6 +781,38 @@ class SemanticAnalyzer(ASTVisitor):
             )
             node.inferred_type = ERROR_TYPE
             return ERROR_TYPE
+
+        if operator == "&":
+            if not isinstance(node.operand, (IdentifierExprNode, ArrayAccessExprNode, StructAccessExprNode)):
+                self.error_reporter.add(
+                    SemanticErrorKind.INVALID_ASSIGNMENT_TARGET,
+                    "operator '&' requires addressable operand",
+                    node.operator.line,
+                    node.operator.column,
+                    context=self._current_context(),
+                )
+                node.inferred_type = ERROR_TYPE
+                return ERROR_TYPE
+
+            node.inferred_type = make_pointer_type(operand_type)
+            return node.inferred_type
+
+        if operator == "*":
+            if not operand_type.is_pointer():
+                self.error_reporter.add(
+                    SemanticErrorKind.TYPE_MISMATCH,
+                    "operator '*' requires pointer operand",
+                    node.operator.line,
+                    node.operator.column,
+                    context=self._current_context(),
+                    expected="pointer",
+                    actual=str(operand_type),
+                )
+                node.inferred_type = ERROR_TYPE
+                return ERROR_TYPE
+
+            node.inferred_type = operand_type.element_type
+            return node.inferred_type
 
         if operator in {"++", "--"}:
             if not isinstance(node.operand, (IdentifierExprNode, StructAccessExprNode)):
@@ -774,12 +969,22 @@ class SemanticAnalyzer(ASTVisitor):
             target_type = self.visit(node.target)
         elif isinstance(node.target, StructAccessExprNode):
             target_type = self._resolve_assignment_target_struct_access(node.target)
+        elif isinstance(node.target, ArrayAccessExprNode):
+            target_type = self.visit(node.target)
         else:
             target_type = self.visit(node.target)
 
         value_type = self.visit(node.value)
 
-        if not isinstance(node.target, (IdentifierExprNode, StructAccessExprNode)):
+        if not isinstance(
+                node.target,
+                (
+                        IdentifierExprNode,
+                        StructAccessExprNode,
+                        ArrayAccessExprNode,
+                        UnaryExprNode,
+                )
+        ):
             self.error_reporter.add(
                 SemanticErrorKind.INVALID_ASSIGNMENT_TARGET,
                 "invalid assignment target",
@@ -789,6 +994,18 @@ class SemanticAnalyzer(ASTVisitor):
             )
             node.inferred_type = ERROR_TYPE
             return ERROR_TYPE
+
+        if isinstance(node.target, UnaryExprNode):
+            if node.target.operator.lexeme != "*":
+                self.error_reporter.add(
+                    SemanticErrorKind.INVALID_ASSIGNMENT_TARGET,
+                    "invalid assignment target",
+                    node.target.line,
+                    node.target.column,
+                    context=self._current_context(),
+                )
+                node.inferred_type = ERROR_TYPE
+                return ERROR_TYPE
 
         target_symbol = getattr(node.target, "symbol", None)
         if target_symbol is not None and not target_symbol.mutable:
@@ -854,11 +1071,6 @@ class SemanticAnalyzer(ASTVisitor):
 
         if isinstance(node.target, IdentifierExprNode) and node.target.symbol is not None:
             node.target.symbol.initialized = True
-        elif isinstance(node.target, StructAccessExprNode):
-            if isinstance(node.target.primary, IdentifierExprNode):
-                base_symbol = self.symbol_table.lookup(node.target.primary.name.lexeme)
-                if base_symbol is not None:
-                    base_symbol.initialized = True
 
         node.inferred_type = target_type
         return target_type
@@ -964,7 +1176,95 @@ class SemanticAnalyzer(ASTVisitor):
         node.inferred_type = field_type
         return field_type
 
+    def visit_ArrayAccessExprNode(self, node: ArrayAccessExprNode):
+        array_type = self.visit(node.array)
+        index_type = self.visit(node.index)
+
+        if array_type is None or array_type == ERROR_TYPE:
+            node.inferred_type = ERROR_TYPE
+            return ERROR_TYPE
+
+        if not array_type.is_array():
+            self.error_reporter.add(
+                SemanticErrorKind.TYPE_MISMATCH,
+                "subscript operator requires array",
+                node.array.line,
+                node.array.column,
+                context=self._current_context(),
+                expected="array",
+                actual=str(array_type),
+            )
+            node.inferred_type = ERROR_TYPE
+            return ERROR_TYPE
+
+        if index_type != INT_TYPE:
+            self.error_reporter.add(
+                SemanticErrorKind.TYPE_MISMATCH,
+                "array index must have type int",
+                node.index.line,
+                node.index.column,
+                context=self._current_context(),
+                expected="int",
+                actual=str(index_type),
+            )
+            node.inferred_type = ERROR_TYPE
+            return ERROR_TYPE
+
+        if isinstance(node.index, LiteralExprNode):
+            index_value = node.index.value
+
+            if isinstance(index_value, int):
+                array_size = int(array_type.array_size)
+
+                if index_value < 0 or index_value >= array_size:
+                    self.error_reporter.add(
+                        SemanticErrorKind.TYPE_MISMATCH,
+                        "array index out of bounds",
+                        node.index.line,
+                        node.index.column,
+                        context=self._current_context(),
+                        expected=f"0..{array_size - 1}",
+                        actual=str(index_value),
+                    )
+                    node.inferred_type = ERROR_TYPE
+                    return ERROR_TYPE
+
+        node.inferred_type = array_type.element_type
+        return node.inferred_type
+
+    def visit_ArrayInitializerExprNode(self, node: ArrayInitializerExprNode):
+        element_types = []
+
+        for element in node.elements:
+            element_type = self.visit(element)
+            element_types.append(element_type)
+
+        if not element_types:
+            node.inferred_type = ERROR_TYPE
+            return ERROR_TYPE
+
+        first_type = element_types[0]
+
+        for element, element_type in zip(node.elements, element_types):
+            if element_type is not None and not first_type.is_assignable_from(element_type):
+                self.error_reporter.add(
+                    SemanticErrorKind.TYPE_MISMATCH,
+                    "array initializer elements must have compatible types",
+                    element.line,
+                    element.column,
+                    context=self._current_context(),
+                    expected=str(first_type),
+                    actual=str(element_type),
+                )
+                node.inferred_type = ERROR_TYPE
+                return ERROR_TYPE
+
+        node.inferred_type = make_array_type(first_type, len(node.elements))
+        return node.inferred_type
+
     def _predeclare_block_variables(self, statements) -> None:
+        from src.semantic.type_system import get_type_size, get_type_alignment
+
         for index, stmt in enumerate(statements):
             if not isinstance(stmt, VarDeclStmtNode):
                 continue
@@ -1140,48 +1440,3 @@ class SemanticAnalyzer(ASTVisitor):
         if self.current_function is not None:
             return f"in function '{self.current_function.name}'"
         return "in global scope"
-
-    def format_validation_report(self) -> str:
-        parts = [
-            f"Semantic summary: errors={self.error_reporter.error_count()}",
-            "",
-            "Declared symbols by scope:",
-            self.symbol_table.dump(),
-            "",
-            self.symbol_table.dump_memory_layout(),
-            "",
-            "Type inference results:",
-            self._format_type_report(),
-        ]
-        return "\n".join(parts)
-
-    def _format_type_report(self) -> str:
-        lines = []
-        if self.decorated_ast is not None:
-            self._collect_type_report(self.decorated_ast, lines)
-        return "\n".join(lines) if lines else "No type inference data."
-
-    def _collect_type_report(self, node, lines):
-        if node is None or not isinstance(node, ASTNode):
-            return
-
-        if hasattr(node, "inferred_type") and node.inferred_type is not None:
-            const_part = ""
-            if getattr(node, "constant_value", None) is not None:
-                const_part = f", const={node.constant_value!r}"
-
-            lines.append(
-                f"Line {getattr(node, 'line', '?')}:{getattr(node, 'column', '?')} "
-                f"{node.__class__.__name__} -> {node.inferred_type}{const_part}"
-            )
-
-        for key, value in vars(node).items():
-            if key in {"symbol", "inferred_type", "constant_value"}:
-                continue
-
-            if isinstance(value, list):
-                for item in value:
-                    if isinstance(item, ASTNode):
-                        self._collect_type_report(item, lines)
-            elif isinstance(value, ASTNode):
-                self._collect_type_report(value, lines)
